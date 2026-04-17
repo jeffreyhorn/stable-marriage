@@ -9,8 +9,8 @@ from stable_marriage import stable_marriage
 from tests.fixtures import (
     make_invalid_preference_profiles,
     make_invalid_roster_preferences,
-    make_unique_matching_preferences,
     make_residency_preferences,
+    make_unique_matching_preferences,
     make_worst_case_preferences,
 )
 
@@ -78,7 +78,9 @@ def test_swapping_roles_preserves_matching_consistency():
     swapped_matches = stable_marriage(receivers, proposers)
 
     assert len(matches) == len(proposers)
-    assert {receiver: proposer for proposer, receiver in matches.items()} == swapped_matches
+    assert {
+        receiver: proposer for proposer, receiver in matches.items()
+    } == swapped_matches
 
 
 def test_randomized_preferences_produce_stable_matchings():
@@ -165,7 +167,10 @@ def test_large_residency_dataset_scales_reasonably():
             if rank >= matched_rank:
                 continue
             current_partner = reverse_matches[receiver]
-            assert receiver_ranks[receiver][proposer] >= receiver_ranks[receiver][current_partner]
+            assert (
+                receiver_ranks[receiver][proposer]
+                >= receiver_ranks[receiver][current_partner]
+            )
 
 
 def test_worst_case_preferences_trigger_quadratic_proposals():

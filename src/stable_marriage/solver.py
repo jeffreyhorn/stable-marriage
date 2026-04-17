@@ -15,6 +15,7 @@ from typing import (
     Set,
     Tuple,
     TypeVar,
+    cast,
 )
 
 Person = TypeVar("Person", bound=Hashable)
@@ -60,6 +61,23 @@ def stable_marriage_with_couples(
     :func:`stable_marriage` API. Stable matching with couples is substantially
     harder than classical one-to-one stable marriage, and this implementation
     is a heuristic layered on top of Gale-Shapley style proposals.
+
+    Args:
+        proposers: Mapping of proposer identifiers to their ordered preference
+            lists.
+        receivers: Mapping of receiver identifiers to their ordered preference
+            lists.
+        couples: Mapping describing coupled proposers whose assignments must
+            satisfy the heuristic's joint constraints.
+
+    Returns:
+        Dict mapping each proposer to the receiver they are matched with.
+
+    Raises:
+        ValueError: If preference lists are inconsistent or omit required
+            participants, or if the heuristic could not find an acceptable
+            assignment for the supplied data. In the latter case, the error
+            does not prove that no stable assignment exists.
 
     A returned matching satisfies the heuristic's constraints for the supplied
     data. A ``ValueError`` indicates that the heuristic could not find an
@@ -145,7 +163,7 @@ def _stable_marriage_with_couples(
     }
 
     entity_members: Dict[str, List[Person]] = {}
-    entity_preferences: Dict[str, Sequence[str]] = {}
+    entity_preferences: Dict[str, Sequence[Person] | Sequence[str]] = {}
     entity_kind: Dict[str, str] = {}
     next_choice_index: Dict[str, int] = {}
     member_to_entity: Dict[Person, str] = {}
@@ -171,7 +189,7 @@ def _stable_marriage_with_couples(
             continue
         name = str(proposer)
         entity_members[name] = [proposer]
-        entity_preferences[name] = list(proposers[proposer])
+        entity_preferences[name] = proposers[proposer]
         entity_kind[name] = "single"
         next_choice_index[name] = 0
         queue.append(name)
@@ -212,7 +230,7 @@ def _stable_marriage_with_couples(
 
         if entity_kind[entity] == "single":
             member = entity_members[entity][0]
-            receiver = choice  # type: ignore[assignment]
+            receiver = cast(Person, choice)
 
             current_partner = engagements.get(receiver)
             if current_partner is None:
@@ -238,7 +256,7 @@ def _stable_marriage_with_couples(
 
         # Couple proposal.
         members = entity_members[entity]
-        base = choice
+        base = cast(str, choice)
 
         targeted = _select_couple_targets(members, base, member_base_options)
 
@@ -274,13 +292,17 @@ def _stable_marriage_with_couples(
             engagements[receiver] = member
             member_assignment[member] = receiver
 
-    unmatched = [member for member, receiver in member_assignment.items() if receiver is None]
+    unmatched = [
+        member for member, receiver in member_assignment.items() if receiver is None
+    ]
     if unmatched:
         raise ValueError(
             "Failed to compute a stable matching that satisfies the couple constraints."
         )
 
-    return {member: receiver for member, receiver in member_assignment.items() if receiver}
+    return {
+        member: receiver for member, receiver in member_assignment.items() if receiver
+    }
 
 
 def _validate_couples(
@@ -408,7 +430,7 @@ def _select_couple_targets(
     return selected
 
 
-def _receiver_base(receiver: Person) -> str:
+def _receiver_base(receiver: Hashable) -> str:
     """
     Derive a base identifier from a receiver label.
 
@@ -417,12 +439,12 @@ def _receiver_base(receiver: Person) -> str:
         Hospital-1-SlotA -> Hospital-1
     """
 
-    if isinstance(receiver, str):
-        for delimiter in ("_", "-"):
-            if delimiter in receiver:
-                return receiver.split(delimiter, 1)[0]
-        return receiver
-    return str(receiver)
+    receiver_text = receiver if isinstance(receiver, str) else str(receiver)
+
+    for delimiter in ("_", "-"):
+        if delimiter in receiver_text:
+            return receiver_text.split(delimiter, 1)[0]
+    return receiver_text
 
 
 def _validate_inputs(
@@ -451,9 +473,7 @@ def _validate_inputs(
         raise ValueError("At least one receiver is required.")
 
     if len(proposer_ids) != len(receiver_ids):
-        raise ValueError(
-            "The number of proposers must equal the number of receivers."
-        )
+        raise ValueError("The number of proposers must equal the number of receivers.")
 
     # Capture the required identities for each side so every participant ranks
     # all possible partners exactly once.
@@ -499,8 +519,10 @@ def _validate_preference_list(
         extra = preference_set - expected_set
         messages: List[str] = []
         if missing:
-            messages.append(f"missing preferences for: {sorted(missing)}")
+            messages.append(
+                f"missing preferences for: {sorted(str(item) for item in missing)}"
+            )
         if extra:
-            messages.append(f"unexpected names: {sorted(extra)}")
+            messages.append(f"unexpected names: {sorted(str(item) for item in extra)}")
         problem = "; ".join(messages)
         raise ValueError(f"Invalid preferences for {participant!r}: {problem}.")
