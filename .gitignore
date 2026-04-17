@@ -32,3 +32,6 @@ pip-wheel-metadata/
 # Editors and local tooling
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
