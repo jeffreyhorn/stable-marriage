@@ -1,4 +1,4 @@
-"""Pure-Python implementation of the Gale–Shapley stable marriage algorithm."""
+"""Pure-Python implementation of stable matching helpers."""
 
 from __future__ import annotations
 
@@ -25,37 +25,48 @@ CoupleMapping = Mapping[str, Sequence[Person]]
 def stable_marriage(
     proposers: Mapping[Person, Sequence[Person]],
     receivers: Mapping[Person, Sequence[Person]],
-    couples: Optional[CoupleMapping] = None,
 ) -> Matching:
     """
-    Compute a stable matching using the Gale–Shapley algorithm.
+    Compute a stable matching using the classical Gale-Shapley algorithm.
 
     Args:
         proposers: Mapping of proposer identifiers to their ordered preference lists.
         receivers: Mapping of receiver identifiers to their ordered preference lists.
-        couples: Optional mapping of couple identifiers to the proposer members that
-            must be assigned together. When provided, the solver ensures every member
-            of a couple is matched to partners that share the same base identifier
-            (e.g., hospital) across the preference lists.
 
     Returns:
         Dict mapping each proposer to the receiver they are matched with.
 
     Raises:
-        ValueError: If preference lists are inconsistent, omit required participants,
-            or if no stable matching satisfying the couple constraints exists.
+        ValueError: If preference lists are inconsistent or omit required
+            participants.
 
-    The traditional Gale–Shapley algorithm runs in :math:`O(n^2)` time for
-    :math:`n` participants on each side. When couples are provided, the solver
-    augments the procedure with multi-member proposals that still respect the
-    Gale–Shapley acceptance rule while enforcing shared placements.
+    This is the supported public solver for one-to-one stable marriage. It runs
+    in :math:`O(n^2)` time for :math:`n` participants on each side.
     """
 
     _validate_inputs(proposers, receivers)
+    return _stable_marriage_one_to_one(proposers, receivers)
 
-    if not couples:
-        return _stable_marriage_one_to_one(proposers, receivers)
 
+def stable_marriage_with_couples(
+    proposers: Mapping[Person, Sequence[Person]],
+    receivers: Mapping[Person, Sequence[Person]],
+    couples: CoupleMapping,
+) -> Matching:
+    """
+    Compute a matching with an experimental couples heuristic.
+
+    This function is intentionally separate from the supported public
+    :func:`stable_marriage` API. Stable matching with couples is substantially
+    harder than classical one-to-one stable marriage, and this implementation
+    is a heuristic layered on top of Gale-Shapley style proposals.
+
+    A returned matching satisfies the heuristic's constraints for the supplied
+    data. A ``ValueError`` indicates that the heuristic could not find an
+    acceptable assignment; it does not prove that no stable assignment exists.
+    """
+
+    _validate_inputs(proposers, receivers)
     return _stable_marriage_with_couples(proposers, receivers, couples)
 
 

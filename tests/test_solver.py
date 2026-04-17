@@ -7,8 +7,6 @@ import pytest
 
 from stable_marriage import stable_marriage
 from tests.fixtures import (
-    make_conflicting_coupled_preferences,
-    make_coupled_preferences,
     make_invalid_preference_profiles,
     make_invalid_roster_preferences,
     make_unique_matching_preferences,
@@ -229,21 +227,8 @@ def test_missing_preferences_raise_value_error():
         stable_marriage(proposers, receivers)
 
 
-def test_coupled_members_align_in_cooperative_preferences():
-    proposers, receivers, couples = make_coupled_preferences()
+def test_root_api_is_one_to_one_only():
+    proposers, receivers = make_unique_matching_preferences()
 
-    matches = stable_marriage(proposers, receivers, couples=couples)
-
-    def hospital_base(receiver: str) -> str:
-        return receiver.split("_")[0]
-
-    for members in couples.values():
-        placements = {hospital_base(matches[member]) for member in members}
-        assert len(placements) == 1
-
-
-def test_conflicting_coupled_preferences_expose_limitation():
-    proposers, receivers, couples = make_conflicting_coupled_preferences()
-
-    with pytest.raises(ValueError):
-        stable_marriage(proposers, receivers, couples=couples)
+    with pytest.raises(TypeError):
+        stable_marriage(proposers, receivers, couples={})  # type: ignore[call-arg]

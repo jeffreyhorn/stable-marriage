@@ -8,17 +8,21 @@
 
 ## Build, Test, and Development Commands
 - `python -m venv .venv && source .venv/bin/activate`: create and enter the local environment.
-- `pip install -r requirements.txt`: install runtime and dev dependencies.
-- `pytest`: run the full test suite; use `pytest tests/test_matching.py -k stability` to target specific cases.
+- `pip install -e .[dev]`: install the package and development dependencies in editable mode.
+- `pytest`: run the full test suite; use `pytest tests/test_solver.py -k stability` to target specific cases.
 - `ruff format src tests`: auto-format Python sources before committing.
 - `ruff check src tests`: lint Python sources; append `--fix` before committing.
-- `python -m stable_marriage.cli --input data/sample_preferences.json --output data/matching.json`: execute the reference CLI matcher and write the result.
+- `python -m stable_marriage.cli --input data/sample_preferences.json --output data/matching.json`: execute the reference CLI matcher and write the result after installing the package.
 
 ## CLI Usage
 - Preference files are JSON objects with `proposers` and `receivers` keys whose values map participant IDs to ranked lists (arrays) of the opposite side.
-- Run `python -m stable_marriage.cli --input path/to/preferences.json` to print the stable matching to stdout.
+- Run `python -m stable_marriage.cli --input path/to/preferences.json` to print the stable matching to stdout after `pip install -e .[dev]` or `pip install .`.
 - Provide `--output path/to/matches.json` to persist the matching, and `--indent 0` to disable pretty-printing when embedding in scripts.
 - Exit code `1` signals invalid input or write errors (malformed JSON, incomplete keys, non-array preferences, or unwritable output paths); the CLI prints the error message to stderr for quick diagnosis.
+
+## API Status
+- The supported root API is the one-to-one `stable_marriage(...)` solver.
+- Couples support is experimental and should be accessed only via `stable_marriage.experimental.stable_marriage_with_couples(...)`.
 
 ## Coding Style & Naming Conventions
 - Target Python 3.11+, four-space indentation, and type-annotate public APIs (`def find_matches(...) -> MatchingResult`).
