@@ -13,6 +13,7 @@
 - `ruff format src tests`: auto-format Python sources before committing.
 - `ruff check src tests`: lint Python sources; append `--fix` before committing.
 - `python -m stable_marriage.cli --input data/sample_preferences.json --output data/matching.json`: execute the reference CLI matcher and write the result after installing the package.
+- CI currently validates the project on Python 3.11 and 3.12.
 
 ## CLI Usage
 - Preference files are JSON objects with `proposers` and `receivers` keys whose values map participant IDs to ranked lists (arrays) of the opposite side.

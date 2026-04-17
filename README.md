@@ -6,7 +6,8 @@ Pure-Python utilities for solving the classical stable marriage problem.
 
 - Supported public API: one-to-one stable marriage via Gale-Shapley.
 - Experimental API: couples support is available under `stable_marriage.experimental` as a heuristic with narrower guarantees.
-- Supported Python versions: 3.11+.
+- Requires Python 3.11 or newer.
+- CI currently runs on Python 3.11 and 3.12.
 
 ## Installation
 
