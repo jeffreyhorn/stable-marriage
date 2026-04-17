@@ -11,7 +11,7 @@ Pure-Python utilities for solving the classical stable marriage problem.
 
 ## Installation
 
-For local development from this repository:
+For a fresh repository checkout, use an editable install:
 
 ```bash
 python -m venv .venv
@@ -19,11 +19,26 @@ source .venv/bin/activate
 pip install -e .[dev]
 ```
 
+That installs the package from `src/` and makes the CLI entry module importable
+from the repository root while also installing the development tools used in CI.
+
 For a non-editable local install:
 
 ```bash
 pip install .
 ```
+
+## Quick start from a fresh checkout
+
+After the editable install completes:
+
+```bash
+pytest
+ruff check src tests
+python -m stable_marriage.cli --input data/sample_preferences.json
+```
+
+Those commands should pass from the repository root in a clean local environment.
 
 ## Library usage
 
@@ -47,7 +62,7 @@ matches = stable_marriage(proposers, receivers)
 
 ## CLI usage
 
-Install the package first, then run:
+Because this project uses a `src/` layout, install the package first and then run:
 
 ```bash
 python -m stable_marriage.cli --input data/sample_preferences.json
