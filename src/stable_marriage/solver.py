@@ -21,6 +21,7 @@ from typing import (
 Person = TypeVar("Person", bound=Hashable)
 Matching = Dict[Person, Person]
 CoupleMapping = Mapping[str, Sequence[Person]]
+EntityId = Tuple[str, Hashable]
 
 
 def stable_marriage(
@@ -162,21 +163,19 @@ def _stable_marriage_with_couples(
         proposer: None for proposer in proposers.keys()
     }
 
-    entity_members: Dict[str, List[Person]] = {}
-    entity_preferences: Dict[str, Sequence[Person] | Sequence[str]] = {}
-    entity_kind: Dict[str, str] = {}
-    next_choice_index: Dict[str, int] = {}
-    member_to_entity: Dict[Person, str] = {}
+    entity_members: Dict[EntityId, List[Person]] = {}
+    entity_preferences: Dict[EntityId, Sequence[Person] | Sequence[str]] = {}
+    next_choice_index: Dict[EntityId, int] = {}
+    member_to_entity: Dict[Person, EntityId] = {}
 
-    queue: Deque[str] = deque()
-    in_queue: Set[str] = set()
+    queue: Deque[EntityId] = deque()
+    in_queue: Set[EntityId] = set()
 
     couple_member_ids: Set[Person] = set()
     for couple_id, members in couples.items():
-        name = f"couple:{couple_id}"
+        name: EntityId = ("couple", couple_id)
         entity_members[name] = list(members)
         entity_preferences[name] = couple_preferences[couple_id]
-        entity_kind[name] = "couple"
         next_choice_index[name] = 0
         queue.append(name)
         in_queue.add(name)
@@ -187,21 +186,24 @@ def _stable_marriage_with_couples(
     for proposer in proposers.keys():
         if proposer in couple_member_ids:
             continue
-        name = str(proposer)
+        name = ("single", proposer)
         entity_members[name] = [proposer]
         entity_preferences[name] = proposers[proposer]
-        entity_kind[name] = "single"
         next_choice_index[name] = 0
         queue.append(name)
         in_queue.add(name)
         member_to_entity[proposer] = name
 
-    def enqueue(entity: str) -> None:
+    def entity_label(entity: EntityId) -> str:
+        kind, identifier = entity
+        return f"{kind}:{identifier!r}"
+
+    def enqueue(entity: EntityId) -> None:
         if entity not in in_queue:
             queue.append(entity)
             in_queue.add(entity)
 
-    def release_entity(entity: str, requeue: bool = True) -> None:
+    def release_entity(entity: EntityId, requeue: bool = True) -> None:
         members = entity_members[entity]
         for member in members:
             current_receiver = member_assignment.get(member)
@@ -222,13 +224,13 @@ def _stable_marriage_with_couples(
 
         if index >= len(preferences):
             raise ValueError(
-                f"{entity!r} exhausted all preference options without a stable match."
+                f"{entity_label(entity)} exhausted all preference options without a stable match."
             )
 
         choice = preferences[index]
         next_choice_index[entity] += 1
 
-        if entity_kind[entity] == "single":
+        if entity[0] == "single":
             member = entity_members[entity][0]
             receiver = cast(Person, choice)
 
@@ -261,7 +263,7 @@ def _stable_marriage_with_couples(
         targeted = _select_couple_targets(members, base, member_base_options)
 
         rejecting = False
-        displaced_entities: Set[str] = set()
+        displaced_entities: Set[EntityId] = set()
         for member, receiver in targeted:
             current_partner = engagements.get(receiver)
             if current_partner is None:

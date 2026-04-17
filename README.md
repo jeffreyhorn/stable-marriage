@@ -91,6 +91,6 @@ that no stable assignment exists.
 
 ## Development
 
-- Run tests with `pytest`.
-- Check style with `ruff check src tests`.
-- Format changes with `ruff format src tests`.
+- Run tests with `make test`.
+- Check style with `make lint`.
+- Format changes with `make format`.

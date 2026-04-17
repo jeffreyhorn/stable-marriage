@@ -27,3 +27,18 @@ def test_conflicting_coupled_preferences_expose_limitation():
 
     with pytest.raises(ValueError):
         stable_marriage_with_couples(proposers, receivers, couples)
+
+
+def test_single_entities_do_not_collide_on_stringified_ids():
+    proposers = {
+        1: ["X", "Y"],
+        "1": ["Y", "X"],
+    }
+    receivers = {
+        "X": [1, "1"],
+        "Y": ["1", 1],
+    }
+
+    matches = stable_marriage_with_couples(proposers, receivers, couples={})
+
+    assert matches == {1: "X", "1": "Y"}
