@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
+from typing import cast
 
 from .types import Person
 
@@ -69,7 +70,7 @@ def _ensure_preference_sequence(
             f"Invalid preferences for {participant!r}: expected an ordered sequence of participants."
         )
 
-    return preferences
+    return cast(Sequence[Person], preferences)
 
 
 def _validate_preference_list(
