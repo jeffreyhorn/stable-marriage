@@ -112,7 +112,8 @@ def test_downstream_mypy_reveals_concrete_root_solver_type(tmp_path):
         encoding="utf-8",
     )
     repo_root = Path(__file__).resolve().parents[1]
-    env = os.environ | {"MYPYPATH": str(repo_root / "src")}
+    env = os.environ.copy()
+    env["MYPYPATH"] = str(repo_root / "src")
 
     completed = subprocess.run(
         [sys.executable, "-m", "mypy", str(sample)],
