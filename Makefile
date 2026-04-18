@@ -20,7 +20,7 @@ help:
 	@echo "Note: If .venv/ exists, it will be used automatically"
 
 install:
-	$(PIP) install -e .
+	$(PIP) install .
 
 install-dev:
 	$(PIP) install -e ".[dev]"

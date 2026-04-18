@@ -303,7 +303,9 @@ def _stable_marriage_with_couples(
         )
 
     return {
-        member: receiver for member, receiver in member_assignment.items() if receiver
+        member: receiver
+        for member, receiver in member_assignment.items()
+        if receiver is not None
     }
 
 
