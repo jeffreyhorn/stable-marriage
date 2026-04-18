@@ -1,11 +1,25 @@
 # stable-marriage
 
-Pure-Python utilities for solving the classical stable marriage problem.
+Pure-Python utilities for solving the classical stable marriage problem with
+the Gale-Shapley algorithm.
+
+## Overview
+
+`stable-marriage` is a small library and CLI for the one-to-one stable
+marriage problem. The supported public API is the classical
+`stable_marriage(...)` solver.
+
+The package also includes an experimental couples heuristic under
+`stable_marriage.experimental`, but that workflow is not part of the supported
+root API and is not exposed through the CLI. See
+[`docs/experimental-couples.md`](docs/experimental-couples.md) for its exact
+model and limitations.
 
 ## Status
 
 - Supported public API: one-to-one stable marriage via Gale-Shapley.
-- Experimental API: couples support is available under `stable_marriage.experimental` as a heuristic with narrower guarantees.
+- Experimental API: couples support is available under
+  `stable_marriage.experimental` as a heuristic with narrower guarantees.
 - Requires Python 3.11 or newer.
 - CI currently runs on Python 3.11 and 3.12.
 
@@ -19,8 +33,9 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-That installs the package from `src/` and makes the CLI entry module importable
-from the repository root while also installing the development tools used in CI.
+That installs the package from `src/`, makes the `stable-marriage` CLI
+available in the active environment, and installs the development tools used in
+CI.
 
 For a non-editable local install:
 
@@ -28,19 +43,20 @@ For a non-editable local install:
 pip install .
 ```
 
-## Quick start from a fresh checkout
+## Quick Start
 
 After the editable install completes:
 
 ```bash
 pytest
 ruff check src tests
-python -m stable_marriage.cli --input data/sample_preferences.json
+stable-marriage --input data/sample_preferences.json
 ```
 
-Those commands should pass from the repository root in a clean local environment.
+Those commands should pass from the repository root in a clean local
+environment.
 
-## Library usage
+## Python API
 
 ```python
 from stable_marriage import stable_marriage
@@ -58,36 +74,135 @@ receivers = {
 }
 
 matches = stable_marriage(proposers, receivers)
+print(matches)
 ```
 
-## CLI usage
+Example result:
 
-Because this project uses a `src/` layout, install the package first and then run:
-
-```bash
-python -m stable_marriage.cli --input data/sample_preferences.json
+```python
+{"A": "X", "B": "Z", "C": "Y"}
 ```
 
-To write output to a file:
+The solver expects complete strict preference lists on both sides:
+
+- Every proposer must rank every receiver exactly once.
+- Every receiver must rank every proposer exactly once.
+- The two sides must contain the same number of participants.
+
+If those requirements are not met, the solver raises `ValueError`.
+
+## CLI
+
+Because this project uses a `src/` layout, install the package first and then
+run:
 
 ```bash
-python -m stable_marriage.cli \
+stable-marriage --input data/sample_preferences.json
+```
+
+Write the matching to a file:
+
+```bash
+stable-marriage \
   --input data/sample_preferences.json \
   --output data/matching.json
 ```
 
-Preference files are JSON objects with `proposers` and `receivers` keys whose
-values map participant IDs to ranked lists of the opposite side.
+Emit compact JSON for shell pipelines:
 
-## Experimental couples API
+```bash
+stable-marriage \
+  --input data/sample_preferences.json \
+  --indent 0
+```
+
+The installed CLI intentionally supports only the classical one-to-one solver.
+It rejects experimental couples input; use the library API for that workflow.
+
+### Exit behavior
+
+- Exit code `0`: successful solve and output write.
+- Exit code `1`: invalid input or expected file I/O errors such as malformed
+  JSON, unreadable input, or unwritable output paths.
+
+## Input JSON Schema
+
+The CLI expects a JSON object with exactly two top-level keys:
+
+- `proposers`: object mapping proposer IDs to ordered arrays of receiver IDs
+- `receivers`: object mapping receiver IDs to ordered arrays of proposer IDs
+
+Schema shape:
+
+```json
+{
+  "proposers": {
+    "<proposer-id>": ["<receiver-id-1>", "<receiver-id-2>"]
+  },
+  "receivers": {
+    "<receiver-id>": ["<proposer-id-1>", "<proposer-id-2>"]
+  }
+}
+```
+
+Rules:
+
+- Participant IDs must be JSON scalars that become hashable Python values in
+  the loaded data. In practice, string IDs are the expected format.
+- Preference values must be JSON arrays.
+- Each participant must rank the full opposite side exactly once.
+- The CLI rejects extra top-level keys such as `couples`.
+
+Reference input file:
+
+```json
+{
+  "proposers": {
+    "A": ["X", "Y", "Z"],
+    "B": ["Y", "Z", "X"],
+    "C": ["Y", "X", "Z"]
+  },
+  "receivers": {
+    "X": ["B", "C", "A"],
+    "Y": ["C", "B", "A"],
+    "Z": ["A", "B", "C"]
+  }
+}
+```
+
+This same example is checked into
+[`data/sample_preferences.json`](data/sample_preferences.json).
+
+## Output JSON
+
+The CLI writes a single JSON object mapping each proposer to its assigned
+receiver:
+
+```json
+{
+  "A": "X",
+  "B": "Z",
+  "C": "Y"
+}
+```
+
+## Experimental Couples API
 
 The project includes an experimental couples heuristic at
 `stable_marriage.experimental.stable_marriage_with_couples`.
 
-That heuristic is not part of the supported root API. A returned matching
-represents the heuristic's result for the given input, while a `ValueError`
-means the heuristic failed to find an acceptable assignment. It does not prove
-that no stable assignment exists.
+That heuristic is not part of the supported root API. When it returns, it:
+
+- assigns each proposer to one receiver
+- avoids double-assigning receivers
+- keeps each couple on distinct receivers from the same derived base
+
+It does not guarantee a stable matching for the general couples problem, and a
+`ValueError` only means the heuristic failed on that input. It does not prove
+that no acceptable assignment exists.
+
+For the exact model, failure modes, and constraints, see
+[`docs/experimental-couples.md`](docs/experimental-couples.md).
 
 ## Development
 

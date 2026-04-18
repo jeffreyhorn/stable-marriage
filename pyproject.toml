@@ -30,6 +30,9 @@ dev = [
     "ruff>=0.2.0",
 ]
 
+[project.scripts]
+stable-marriage = "stable_marriage.cli:main"
+
 [tool.ruff]
 target-version = "py311"
 

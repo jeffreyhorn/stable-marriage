@@ -12,21 +12,28 @@ __pycache__/
 venv/
 env/
 install/
+.python-version
 
 # Test and lint caches
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.hypothesis/
+.tox/
+.nox/
+.cache/
 
 # Coverage
 .coverage
 .coverage.*
+coverage.xml
 htmlcov/
 
 # Packaging artifacts
 build/
 dist/
 *.egg-info/
+*.egg
 pip-wheel-metadata/
 
 # Editors and local tooling
