@@ -115,7 +115,8 @@ def test_installed_console_script_smoke(tmp_path):
 def test_python_dash_m_works_without_install(tmp_path):
     input_path = make_sample_preferences(tmp_path / "prefs.json")
     repo_root = Path(__file__).resolve().parents[1]
-    env = os.environ | {"PYTHONPATH": str(repo_root / "src")}
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(repo_root / "src")
 
     completed = subprocess.run(
         [
