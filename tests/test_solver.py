@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
+from importlib import metadata as importlib_metadata
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 
@@ -82,13 +83,15 @@ def test_package_version_falls_back_when_distribution_metadata_is_missing(monkey
     def raise_package_not_found(_: str) -> str:
         raise PackageNotFoundError("stable-marriage")
 
-    monkeypatch.setattr("importlib.metadata.version", raise_package_not_found)
+    original_version = importlib_metadata.version
+    monkeypatch.setattr(importlib_metadata, "version", raise_package_not_found)
 
     reloaded_package = importlib.reload(stable_marriage_package)
 
     try:
         assert reloaded_package.__version__ == "0.0.0-dev"
     finally:
+        monkeypatch.setattr(importlib_metadata, "version", original_version)
         importlib.reload(stable_marriage_package)
 
 
