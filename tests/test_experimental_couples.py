@@ -39,6 +39,8 @@ def test_receiver_base_keeps_hyphenated_hospital_name():
     assert _receiver_base("Hospital-1-SlotA") == "Hospital-1"
     assert _receiver_base("Hospital-1-SlotB") == "Hospital-1"
     assert _receiver_base("H1_A") == "H1"
+    assert _receiver_base("Hospital-1") == "Hospital-1"
+    assert _receiver_base("Hospital_1") == "Hospital_1"
 
 
 def test_couples_mode_accepts_hyphenated_receiver_bases():

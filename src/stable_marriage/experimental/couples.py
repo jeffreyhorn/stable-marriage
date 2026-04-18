@@ -383,8 +383,15 @@ def _receiver_base(receiver: Hashable) -> str:
     split_at = -1
     for delimiter in ("_", "-"):
         split_at = max(split_at, receiver_text.rfind(delimiter))
-    if split_at != -1:
+    if split_at == -1:
+        return receiver_text
+
+    suffix = receiver_text[split_at + 1 :]
+    if (len(suffix) == 1 and suffix.isalpha()) or (
+        suffix.startswith("Slot") and len(suffix) > 4 and suffix[4:].isalpha()
+    ):
         return receiver_text[:split_at]
+
     return receiver_text
 
 

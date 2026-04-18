@@ -73,6 +73,14 @@ def test_empty_receiver_roster_raises_value_error():
         stable_marriage({"A": []}, {})
 
 
+def test_non_sequence_preferences_raise_value_error():
+    proposers = {"A": {"X", "Y"}, "B": ["Y", "X"]}  # type: ignore[dict-item]
+    receivers = {"X": ["A", "B"], "Y": ["B", "A"]}
+
+    with pytest.raises(ValueError, match="expected an ordered sequence"):
+        stable_marriage(proposers, receivers)
+
+
 @pytest.mark.parametrize(
     ("proposers", "receivers"),
     make_invalid_preference_profiles(),

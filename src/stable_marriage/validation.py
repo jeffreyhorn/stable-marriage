@@ -39,10 +39,34 @@ def validate_inputs(
     expected_proposers = proposer_ids
 
     for proposer, preferences in proposers.items():
-        _validate_preference_list(proposer, preferences, expected_receivers)
+        validated_preferences = _ensure_preference_sequence(proposer, preferences)
+        _validate_preference_list(proposer, validated_preferences, expected_receivers)
 
     for receiver, preferences in receivers.items():
-        _validate_preference_list(receiver, preferences, expected_proposers)
+        validated_preferences = _ensure_preference_sequence(receiver, preferences)
+        _validate_preference_list(receiver, validated_preferences, expected_proposers)
+
+
+def _ensure_preference_sequence(
+    participant: Person, preferences: object
+) -> Sequence[Person]:
+    """
+    Ensure a participant's preferences are provided as an ordered sequence.
+
+    Args:
+        participant: The participant whose preferences are being validated.
+        preferences: The raw preferences value supplied by the caller.
+
+    Raises:
+        ValueError: If preferences is not a sequence or is a string/bytes value.
+    """
+
+    if isinstance(preferences, (str, bytes)) or not isinstance(preferences, Sequence):
+        raise ValueError(
+            f"Invalid preferences for {participant!r}: expected an ordered sequence of participants."
+        )
+
+    return preferences
 
 
 def _validate_preference_list(

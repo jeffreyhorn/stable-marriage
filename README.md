@@ -59,6 +59,8 @@ environment.
 ## Python API
 
 ```python
+import json
+
 from stable_marriage import stable_marriage
 
 proposers = {
@@ -74,10 +76,10 @@ receivers = {
 }
 
 matches = stable_marriage(proposers, receivers)
-print(matches)
+print(json.dumps(matches, sort_keys=True))
 ```
 
-Example result:
+Example JSON output:
 
 ```python
 {"A": "X", "B": "Z", "C": "Y"}
