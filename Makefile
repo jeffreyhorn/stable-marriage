@@ -49,7 +49,7 @@ typecheck:
 
 coverage:
 	@echo "Running tests with coverage..."
-	$(PYTHON) -m pytest --cov=stable_marriage --cov-report=term-missing tests/
+	$(PYTHON) -m pytest --cov=stable_marriage --cov-report=term-missing --cov-fail-under=90 tests/
 
 packaging-smoke:
 	@echo "Running packaging smoke checks..."
