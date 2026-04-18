@@ -8,22 +8,28 @@
 
 ## Build, Test, and Development Commands
 - `python -m venv .venv && source .venv/bin/activate`: create and enter the local environment.
-- `pip install -r requirements.txt`: install runtime and dev dependencies.
-- `pytest`: run the full test suite; use `pytest tests/test_matching.py -k stability` to target specific cases.
-- `ruff format src tests`: auto-format Python sources before committing.
-- `ruff check src tests`: lint Python sources; append `--fix` before committing.
-- `python -m stable_marriage.cli --input data/sample_preferences.json --output data/matching.json`: execute the reference CLI matcher and write the result.
+- `pip install -e ".[dev]"`: install the package and development dependencies in editable mode.
+- After the editable install, run `pytest`, `ruff check src tests`, and `python -m stable_marriage.cli --input data/sample_preferences.json` from the repository root to verify a fresh checkout.
+- `make test`: run the full test suite; use `pytest tests/test_solver.py -k stability` when you need to target specific cases directly.
+- `make format`: format Python sources with the repository's canonical formatter setup.
+- `make lint`: run the repository lint checks.
+- `python -m stable_marriage.cli --input data/sample_preferences.json --output data/matching.json`: execute the reference CLI matcher and write the result after installing the package.
+- CI currently validates the project on Python 3.11 and 3.12.
 
 ## CLI Usage
 - Preference files are JSON objects with `proposers` and `receivers` keys whose values map participant IDs to ranked lists (arrays) of the opposite side.
-- Run `python -m stable_marriage.cli --input path/to/preferences.json` to print the stable matching to stdout.
+- Because the project uses a `src/` layout, run `python -m stable_marriage.cli --input path/to/preferences.json` only after `pip install -e ".[dev]"` or `pip install .`.
 - Provide `--output path/to/matches.json` to persist the matching, and `--indent 0` to disable pretty-printing when embedding in scripts.
 - Exit code `1` signals invalid input or write errors (malformed JSON, incomplete keys, non-array preferences, or unwritable output paths); the CLI prints the error message to stderr for quick diagnosis.
+
+## API Status
+- The supported root API is the one-to-one `stable_marriage(...)` solver.
+- Couples support is experimental and should be accessed only via `stable_marriage.experimental.stable_marriage_with_couples(...)`.
 
 ## Coding Style & Naming Conventions
 - Target Python 3.11+, four-space indentation, and type-annotate public APIs (`def find_matches(...) -> MatchingResult`).
 - Prefer snake_case for functions and variables, PascalCase for classes, and keep module names lowercase (`stable_marriage/rotation_elimination.py`).
-- Run `ruff format` (Black-compatible) before pushing; CI rejects non-formatted diffs.
+- Run `make format` before pushing; the repository formatter path uses `black` plus Ruff import cleanup.
 - Document non-trivial functions with Google-style docstrings and explain algorithmic complexity where it aids readers.
 
 ## Testing Guidelines

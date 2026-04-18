@@ -40,7 +40,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def load_preferences(path: Path) -> tuple[dict[Hashable, list[Hashable]], dict[Hashable, list[Hashable]]]:
+def load_preferences(
+    path: Path,
+) -> tuple[dict[Hashable, list[Hashable]], dict[Hashable, list[Hashable]]]:
     """Load and validate proposer and receiver preferences from a JSON file."""
 
     try:
@@ -57,7 +59,9 @@ def load_preferences(path: Path) -> tuple[dict[Hashable, list[Hashable]], dict[H
         proposers = raw["proposers"]
         receivers = raw["receivers"]
     except KeyError as exc:
-        raise ValueError("Preference file must contain 'proposers' and 'receivers' keys.") from exc
+        raise ValueError(
+            "Preference file must contain 'proposers' and 'receivers' keys."
+        ) from exc
 
     if not isinstance(proposers, Mapping) or not isinstance(receivers, Mapping):
         raise ValueError("'proposers' and 'receivers' must be JSON objects.")
@@ -88,9 +92,13 @@ def _canonicalize_preferences(
 
     for participant, preferences in raw_preferences.items():
         if not isinstance(participant, Hashable):
-            raise ValueError(f"{label} keys must be hashable identifiers; got {participant!r}.")
+            raise ValueError(
+                f"{label} keys must be hashable identifiers; got {participant!r}."
+            )
 
-        if not isinstance(preferences, Sequence) or isinstance(preferences, (str, bytes)):
+        if not isinstance(preferences, Sequence) or isinstance(
+            preferences, (str, bytes)
+        ):
             raise ValueError(
                 f"{label} preference list for {participant!r} must be a JSON array of identifiers."
             )

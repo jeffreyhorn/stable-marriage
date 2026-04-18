@@ -7,12 +7,10 @@ import pytest
 
 from stable_marriage import stable_marriage
 from tests.fixtures import (
-    make_conflicting_coupled_preferences,
-    make_coupled_preferences,
     make_invalid_preference_profiles,
     make_invalid_roster_preferences,
-    make_unique_matching_preferences,
     make_residency_preferences,
+    make_unique_matching_preferences,
     make_worst_case_preferences,
 )
 
@@ -80,7 +78,9 @@ def test_swapping_roles_preserves_matching_consistency():
     swapped_matches = stable_marriage(receivers, proposers)
 
     assert len(matches) == len(proposers)
-    assert {receiver: proposer for proposer, receiver in matches.items()} == swapped_matches
+    assert {
+        receiver: proposer for proposer, receiver in matches.items()
+    } == swapped_matches
 
 
 def test_randomized_preferences_produce_stable_matchings():
@@ -167,7 +167,10 @@ def test_large_residency_dataset_scales_reasonably():
             if rank >= matched_rank:
                 continue
             current_partner = reverse_matches[receiver]
-            assert receiver_ranks[receiver][proposer] >= receiver_ranks[receiver][current_partner]
+            assert (
+                receiver_ranks[receiver][proposer]
+                >= receiver_ranks[receiver][current_partner]
+            )
 
 
 def test_worst_case_preferences_trigger_quadratic_proposals():
@@ -229,21 +232,8 @@ def test_missing_preferences_raise_value_error():
         stable_marriage(proposers, receivers)
 
 
-def test_coupled_members_align_in_cooperative_preferences():
-    proposers, receivers, couples = make_coupled_preferences()
+def test_root_api_is_one_to_one_only():
+    proposers, receivers = make_unique_matching_preferences()
 
-    matches = stable_marriage(proposers, receivers, couples=couples)
-
-    def hospital_base(receiver: str) -> str:
-        return receiver.split("_")[0]
-
-    for members in couples.values():
-        placements = {hospital_base(matches[member]) for member in members}
-        assert len(placements) == 1
-
-
-def test_conflicting_coupled_preferences_expose_limitation():
-    proposers, receivers, couples = make_conflicting_coupled_preferences()
-
-    with pytest.raises(ValueError):
-        stable_marriage(proposers, receivers, couples=couples)
+    with pytest.raises(TypeError):
+        stable_marriage(proposers, receivers, couples={})  # type: ignore[call-arg]

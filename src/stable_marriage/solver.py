@@ -1,4 +1,4 @@
-"""Pure-Python implementation of the Gale–Shapley stable marriage algorithm."""
+"""Pure-Python implementation of stable matching helpers."""
 
 from __future__ import annotations
 
@@ -15,47 +15,77 @@ from typing import (
     Set,
     Tuple,
     TypeVar,
+    cast,
 )
 
 Person = TypeVar("Person", bound=Hashable)
 Matching = Dict[Person, Person]
 CoupleMapping = Mapping[str, Sequence[Person]]
+EntityId = Tuple[str, Hashable]
 
 
 def stable_marriage(
     proposers: Mapping[Person, Sequence[Person]],
     receivers: Mapping[Person, Sequence[Person]],
-    couples: Optional[CoupleMapping] = None,
 ) -> Matching:
     """
-    Compute a stable matching using the Gale–Shapley algorithm.
+    Compute a stable matching using the classical Gale-Shapley algorithm.
 
     Args:
         proposers: Mapping of proposer identifiers to their ordered preference lists.
         receivers: Mapping of receiver identifiers to their ordered preference lists.
-        couples: Optional mapping of couple identifiers to the proposer members that
-            must be assigned together. When provided, the solver ensures every member
-            of a couple is matched to partners that share the same base identifier
-            (e.g., hospital) across the preference lists.
 
     Returns:
         Dict mapping each proposer to the receiver they are matched with.
 
     Raises:
-        ValueError: If preference lists are inconsistent, omit required participants,
-            or if no stable matching satisfying the couple constraints exists.
+        ValueError: If preference lists are inconsistent or omit required
+            participants.
 
-    The traditional Gale–Shapley algorithm runs in :math:`O(n^2)` time for
-    :math:`n` participants on each side. When couples are provided, the solver
-    augments the procedure with multi-member proposals that still respect the
-    Gale–Shapley acceptance rule while enforcing shared placements.
+    This is the supported public solver for one-to-one stable marriage. It runs
+    in :math:`O(n^2)` time for :math:`n` participants on each side.
     """
 
     _validate_inputs(proposers, receivers)
+    return _stable_marriage_one_to_one(proposers, receivers)
 
-    if not couples:
-        return _stable_marriage_one_to_one(proposers, receivers)
 
+def stable_marriage_with_couples(
+    proposers: Mapping[Person, Sequence[Person]],
+    receivers: Mapping[Person, Sequence[Person]],
+    couples: CoupleMapping,
+) -> Matching:
+    """
+    Compute a matching with an experimental couples heuristic.
+
+    This function is intentionally separate from the supported public
+    :func:`stable_marriage` API. Stable matching with couples is substantially
+    harder than classical one-to-one stable marriage, and this implementation
+    is a heuristic layered on top of Gale-Shapley style proposals.
+
+    Args:
+        proposers: Mapping of proposer identifiers to their ordered preference
+            lists.
+        receivers: Mapping of receiver identifiers to their ordered preference
+            lists.
+        couples: Mapping describing coupled proposers whose assignments must
+            satisfy the heuristic's joint constraints.
+
+    Returns:
+        Dict mapping each proposer to the receiver they are matched with.
+
+    Raises:
+        ValueError: If preference lists are inconsistent or omit required
+            participants, or if the heuristic could not find an acceptable
+            assignment for the supplied data. In the latter case, the error
+            does not prove that no stable assignment exists.
+
+    A returned matching satisfies the heuristic's constraints for the supplied
+    data. A ``ValueError`` indicates that the heuristic could not find an
+    acceptable assignment; it does not prove that no stable assignment exists.
+    """
+
+    _validate_inputs(proposers, receivers)
     return _stable_marriage_with_couples(proposers, receivers, couples)
 
 
@@ -133,21 +163,19 @@ def _stable_marriage_with_couples(
         proposer: None for proposer in proposers.keys()
     }
 
-    entity_members: Dict[str, List[Person]] = {}
-    entity_preferences: Dict[str, Sequence[str]] = {}
-    entity_kind: Dict[str, str] = {}
-    next_choice_index: Dict[str, int] = {}
-    member_to_entity: Dict[Person, str] = {}
+    entity_members: Dict[EntityId, List[Person]] = {}
+    entity_preferences: Dict[EntityId, Sequence[Person] | Sequence[str]] = {}
+    next_choice_index: Dict[EntityId, int] = {}
+    member_to_entity: Dict[Person, EntityId] = {}
 
-    queue: Deque[str] = deque()
-    in_queue: Set[str] = set()
+    queue: Deque[EntityId] = deque()
+    in_queue: Set[EntityId] = set()
 
     couple_member_ids: Set[Person] = set()
     for couple_id, members in couples.items():
-        name = f"couple:{couple_id}"
+        name: EntityId = ("couple", couple_id)
         entity_members[name] = list(members)
         entity_preferences[name] = couple_preferences[couple_id]
-        entity_kind[name] = "couple"
         next_choice_index[name] = 0
         queue.append(name)
         in_queue.add(name)
@@ -158,21 +186,24 @@ def _stable_marriage_with_couples(
     for proposer in proposers.keys():
         if proposer in couple_member_ids:
             continue
-        name = str(proposer)
+        name = ("single", proposer)
         entity_members[name] = [proposer]
-        entity_preferences[name] = list(proposers[proposer])
-        entity_kind[name] = "single"
+        entity_preferences[name] = proposers[proposer]
         next_choice_index[name] = 0
         queue.append(name)
         in_queue.add(name)
         member_to_entity[proposer] = name
 
-    def enqueue(entity: str) -> None:
+    def entity_label(entity: EntityId) -> str:
+        kind, identifier = entity
+        return f"{kind}:{identifier!r}"
+
+    def enqueue(entity: EntityId) -> None:
         if entity not in in_queue:
             queue.append(entity)
             in_queue.add(entity)
 
-    def release_entity(entity: str, requeue: bool = True) -> None:
+    def release_entity(entity: EntityId, requeue: bool = True) -> None:
         members = entity_members[entity]
         for member in members:
             current_receiver = member_assignment.get(member)
@@ -193,15 +224,15 @@ def _stable_marriage_with_couples(
 
         if index >= len(preferences):
             raise ValueError(
-                f"{entity!r} exhausted all preference options without a stable match."
+                f"{entity_label(entity)} exhausted all preference options without a stable match."
             )
 
         choice = preferences[index]
         next_choice_index[entity] += 1
 
-        if entity_kind[entity] == "single":
+        if entity[0] == "single":
             member = entity_members[entity][0]
-            receiver = choice  # type: ignore[assignment]
+            receiver = cast(Person, choice)
 
             current_partner = engagements.get(receiver)
             if current_partner is None:
@@ -227,12 +258,12 @@ def _stable_marriage_with_couples(
 
         # Couple proposal.
         members = entity_members[entity]
-        base = choice
+        base = cast(str, choice)
 
         targeted = _select_couple_targets(members, base, member_base_options)
 
         rejecting = False
-        displaced_entities: Set[str] = set()
+        displaced_entities: Set[EntityId] = set()
         for member, receiver in targeted:
             current_partner = engagements.get(receiver)
             if current_partner is None:
@@ -263,13 +294,19 @@ def _stable_marriage_with_couples(
             engagements[receiver] = member
             member_assignment[member] = receiver
 
-    unmatched = [member for member, receiver in member_assignment.items() if receiver is None]
+    unmatched = [
+        member for member, receiver in member_assignment.items() if receiver is None
+    ]
     if unmatched:
         raise ValueError(
             "Failed to compute a stable matching that satisfies the couple constraints."
         )
 
-    return {member: receiver for member, receiver in member_assignment.items() if receiver}
+    return {
+        member: receiver
+        for member, receiver in member_assignment.items()
+        if receiver is not None
+    }
 
 
 def _validate_couples(
@@ -397,7 +434,7 @@ def _select_couple_targets(
     return selected
 
 
-def _receiver_base(receiver: Person) -> str:
+def _receiver_base(receiver: Hashable) -> str:
     """
     Derive a base identifier from a receiver label.
 
@@ -406,12 +443,12 @@ def _receiver_base(receiver: Person) -> str:
         Hospital-1-SlotA -> Hospital-1
     """
 
-    if isinstance(receiver, str):
-        for delimiter in ("_", "-"):
-            if delimiter in receiver:
-                return receiver.split(delimiter, 1)[0]
-        return receiver
-    return str(receiver)
+    receiver_text = receiver if isinstance(receiver, str) else str(receiver)
+
+    for delimiter in ("_", "-"):
+        if delimiter in receiver_text:
+            return receiver_text.split(delimiter, 1)[0]
+    return receiver_text
 
 
 def _validate_inputs(
@@ -440,9 +477,7 @@ def _validate_inputs(
         raise ValueError("At least one receiver is required.")
 
     if len(proposer_ids) != len(receiver_ids):
-        raise ValueError(
-            "The number of proposers must equal the number of receivers."
-        )
+        raise ValueError("The number of proposers must equal the number of receivers.")
 
     # Capture the required identities for each side so every participant ranks
     # all possible partners exactly once.
@@ -488,8 +523,10 @@ def _validate_preference_list(
         extra = preference_set - expected_set
         messages: List[str] = []
         if missing:
-            messages.append(f"missing preferences for: {sorted(missing)}")
+            messages.append(
+                f"missing preferences for: {sorted(repr(item) for item in missing)}"
+            )
         if extra:
-            messages.append(f"unexpected names: {sorted(extra)}")
+            messages.append(f"unexpected names: {sorted(repr(item) for item in extra)}")
         problem = "; ".join(messages)
         raise ValueError(f"Invalid preferences for {participant!r}: {problem}.")
