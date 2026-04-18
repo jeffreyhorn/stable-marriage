@@ -23,8 +23,11 @@ def validate_inputs(
             any participant omits or duplicates members of the opposite side.
     """
 
-    proposer_ids = set(proposers.keys())
-    receiver_ids = set(receivers.keys())
+    try:
+        proposer_ids = set(proposers.keys())
+        receiver_ids = set(receivers.keys())
+    except TypeError as exc:
+        raise ValueError("Participant identifiers must be hashable.") from exc
 
     if not proposer_ids:
         raise ValueError("At least one proposer is required.")
@@ -87,8 +90,13 @@ def _validate_preference_list(
             contain precisely the expected roster members.
     """
 
-    preference_set = set(preferences)
-    expected_set = set(expected)
+    try:
+        preference_set = set(preferences)
+        expected_set = set(expected)
+    except TypeError as exc:
+        raise ValueError(
+            f"Invalid preferences for {participant!r}: preference entries must be hashable."
+        ) from exc
 
     if len(preferences) != len(expected_set):
         raise ValueError(

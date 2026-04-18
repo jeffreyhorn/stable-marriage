@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import pytest
 
@@ -78,6 +78,44 @@ def test_non_sequence_preferences_raise_value_error():
     receivers = {"X": ["A", "B"], "Y": ["B", "A"]}
 
     with pytest.raises(ValueError, match="expected an ordered sequence"):
+        stable_marriage(proposers, receivers)
+
+
+class UnhashableKeyMapping(Mapping[object, list[tuple[str, ...]]]):
+    """Mapping test double that exposes an unhashable key during iteration."""
+
+    def __init__(self) -> None:
+        self._items: list[tuple[object, list[tuple[str, ...]]]] = [
+            (["X"], [("A",), ("B",)]),
+            ("Y", [("B",), ("A",)]),
+        ]
+
+    def __getitem__(self, key: object) -> list[tuple[str, ...]]:
+        for candidate, value in self._items:
+            if candidate == key:
+                return value
+        raise KeyError(key)
+
+    def __iter__(self):
+        return (key for key, _ in self._items)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+
+def test_unhashable_participant_ids_raise_value_error():
+    proposers = {("A",): ["X"], ("B",): ["Y"]}
+    receivers = UnhashableKeyMapping()
+
+    with pytest.raises(ValueError, match="Participant identifiers must be hashable."):
+        stable_marriage(proposers, receivers)
+
+
+def test_unhashable_preference_entries_raise_value_error():
+    proposers = {"A": [["X"], "Y"], "B": ["Y", "X"]}  # type: ignore[list-item]
+    receivers = {"X": ["A", "B"], "Y": ["B", "A"]}
+
+    with pytest.raises(ValueError, match="preference entries must be hashable"):
         stable_marriage(proposers, receivers)
 
 
