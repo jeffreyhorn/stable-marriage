@@ -154,7 +154,7 @@ def dump_matching(matching: Matching, output_path: Path | None, indent: int) -> 
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """CLI entry point for the installed `stable-marriage` console script."""
+    """CLI entry point for `stable-marriage` or `python -m stable_marriage.cli`."""
 
     args = parse_args(argv)
 

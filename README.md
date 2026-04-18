@@ -81,7 +81,7 @@ print(json.dumps(matches, sort_keys=True))
 
 Example JSON output:
 
-```python
+```json
 {"A": "X", "B": "Z", "C": "Y"}
 ```
 
