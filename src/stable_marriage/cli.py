@@ -9,7 +9,8 @@ from collections.abc import Hashable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from .solver import Matching, stable_marriage
+from .core import stable_marriage
+from .types import Matching
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -43,17 +44,34 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def load_preferences(
     path: Path,
 ) -> tuple[dict[Hashable, list[Hashable]], dict[Hashable, list[Hashable]]]:
-    """Load and validate proposer and receiver preferences from a JSON file."""
+    """Load and validate proposer and receiver preferences from a UTF-8 JSON file."""
 
     try:
-        raw = json.loads(path.read_text())
+        raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise ValueError(f"Input file {path} does not exist.") from exc
+    except OSError as exc:
+        raise ValueError(f"Unable to read input file {path}: {exc}") from exc
     except json.JSONDecodeError as exc:
         raise ValueError(f"Input file {path} is not valid JSON: {exc}") from exc
 
     if not isinstance(raw, dict):
         raise ValueError("Preference file must be a JSON object.")
+
+    expected_keys = {"proposers", "receivers"}
+    unexpected_keys = sorted(set(raw) - expected_keys)
+    if unexpected_keys:
+        if unexpected_keys == ["couples"]:
+            raise ValueError(
+                "The CLI supports only one-to-one inputs; experimental couples "
+                "input is available only through "
+                "`stable_marriage.experimental.stable_marriage_with_couples(...)`."
+            )
+        formatted_keys = ", ".join(repr(key) for key in unexpected_keys)
+        raise ValueError(
+            "Preference file contains unsupported top-level keys: "
+            f"{formatted_keys}. Only 'proposers' and 'receivers' are accepted."
+        )
 
     try:
         proposers = raw["proposers"]
@@ -119,20 +137,24 @@ def _canonicalize_preferences(
 def dump_matching(matching: Matching, output_path: Path | None, indent: int) -> None:
     """Serialize the matching to disk or stdout."""
 
-    payload = json.dumps(matching, indent=indent, sort_keys=True)
+    effective_indent = indent if indent > 0 else None
+    if effective_indent is None:
+        payload = json.dumps(matching, sort_keys=True, separators=(",", ":"))
+    else:
+        payload = json.dumps(matching, indent=effective_indent, sort_keys=True)
 
     if output_path is None:
         print(payload)
         return
 
     try:
-        output_path.write_text(payload + "\n")
+        output_path.write_text(payload + "\n", encoding="utf-8")
     except OSError as exc:
         raise ValueError(f"Unable to write matching to {output_path}: {exc}") from exc
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """CLI entry point compatible with `python -m stable_marriage.cli`."""
+    """CLI entry point for `stable-marriage` or `python -m stable_marriage.cli`."""
 
     args = parse_args(argv)
 

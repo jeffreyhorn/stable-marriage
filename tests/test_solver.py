@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import random
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import pytest
 
-from stable_marriage import stable_marriage
+import stable_marriage.solver as solver_module
+from stable_marriage import core, stable_marriage, types
 from tests.fixtures import (
     make_invalid_preference_profiles,
     make_invalid_roster_preferences,
@@ -62,12 +63,76 @@ def test_invalid_roster_shapes_raise_value_error():
         stable_marriage(proposers, receivers)
 
 
+def test_empty_proposer_roster_raises_value_error():
+    with pytest.raises(ValueError, match="At least one proposer is required."):
+        stable_marriage({}, {"X": []})
+
+
+def test_empty_receiver_roster_raises_value_error():
+    with pytest.raises(ValueError, match="At least one receiver is required."):
+        stable_marriage({"A": []}, {})
+
+
+def test_non_sequence_preferences_raise_value_error():
+    proposers = {"A": {"X", "Y"}, "B": ["Y", "X"]}  # type: ignore[dict-item]
+    receivers = {"X": ["A", "B"], "Y": ["B", "A"]}
+
+    with pytest.raises(ValueError, match="expected an ordered sequence"):
+        stable_marriage(proposers, receivers)
+
+
+class UnhashableKeyMapping(Mapping[object, list[tuple[str, ...]]]):
+    """Mapping test double that exposes an unhashable key during iteration."""
+
+    def __init__(self) -> None:
+        self._items: list[tuple[object, list[tuple[str, ...]]]] = [
+            (["X"], [("A",), ("B",)]),
+            ("Y", [("B",), ("A",)]),
+        ]
+
+    def __getitem__(self, key: object) -> list[tuple[str, ...]]:
+        for candidate, value in self._items:
+            if candidate == key:
+                return value
+        raise KeyError(key)
+
+    def __iter__(self):
+        return (key for key, _ in self._items)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+
+def test_unhashable_participant_ids_raise_value_error():
+    proposers = {("A",): ["X"], ("B",): ["Y"]}
+    receivers = UnhashableKeyMapping()
+
+    with pytest.raises(ValueError, match="Participant identifiers must be hashable."):
+        stable_marriage(proposers, receivers)
+
+
+def test_unhashable_preference_entries_raise_value_error():
+    proposers = {"A": [["X"], "Y"], "B": ["Y", "X"]}  # type: ignore[list-item]
+    receivers = {"X": ["A", "B"], "Y": ["B", "A"]}
+
+    with pytest.raises(ValueError, match="preference entries must be hashable"):
+        stable_marriage(proposers, receivers)
+
+
 @pytest.mark.parametrize(
     ("proposers", "receivers"),
     make_invalid_preference_profiles(),
 )
 def test_invalid_preference_lists_raise_value_error(proposers, receivers):
     with pytest.raises(ValueError):
+        stable_marriage(proposers, receivers)
+
+
+def test_invalid_preference_lists_report_unexpected_names():
+    proposers = {"A": ["Y", "Q"], "B": ["X", "Y"]}
+    receivers = {"X": ["A", "B"], "Y": ["B", "A"]}
+
+    with pytest.raises(ValueError, match="unexpected names"):
         stable_marriage(proposers, receivers)
 
 
@@ -237,3 +302,9 @@ def test_root_api_is_one_to_one_only():
 
     with pytest.raises(TypeError):
         stable_marriage(proposers, receivers, couples={})  # type: ignore[call-arg]
+
+
+def test_solver_module_remains_compatibility_shim():
+    assert solver_module.stable_marriage is core.stable_marriage
+    assert solver_module.Matching is types.Matching
+    assert callable(solver_module._validate_inputs)
