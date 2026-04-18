@@ -524,9 +524,9 @@ def _validate_preference_list(
         messages: List[str] = []
         if missing:
             messages.append(
-                f"missing preferences for: {sorted(str(item) for item in missing)}"
+                f"missing preferences for: {sorted(repr(item) for item in missing)}"
             )
         if extra:
-            messages.append(f"unexpected names: {sorted(str(item) for item in extra)}")
+            messages.append(f"unexpected names: {sorted(repr(item) for item in extra)}")
         problem = "; ".join(messages)
         raise ValueError(f"Invalid preferences for {participant!r}: {problem}.")
