@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import importlib
+import os
 import random
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 
 import pytest
@@ -68,7 +70,7 @@ def test_package_exposes_non_empty_version_string():
 
 def test_package_version_falls_back_when_distribution_metadata_is_missing(monkeypatch):
     def raise_package_not_found(_: str) -> str:
-        raise stable_marriage_package.PackageNotFoundError
+        raise PackageNotFoundError("stable-marriage")
 
     monkeypatch.setattr("importlib.metadata.version", raise_package_not_found)
 
@@ -97,7 +99,7 @@ def test_downstream_mypy_reveals_concrete_root_solver_type(tmp_path):
         encoding="utf-8",
     )
     repo_root = Path(__file__).resolve().parents[1]
-    env = {"MYPYPATH": str(repo_root / "src")}
+    env = os.environ | {"MYPYPATH": str(repo_root / "src")}
 
     completed = subprocess.run(
         [sys.executable, "-m", "mypy", str(sample)],

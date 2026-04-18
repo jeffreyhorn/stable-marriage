@@ -46,10 +46,20 @@ def load_preferences(
     """Load and validate proposer and receiver preferences from a file or stdin."""
 
     if path is None:
+        if sys.stdin.isatty():
+            raise ValueError(
+                "No input provided on stdin. Pass --input PATH or pipe JSON to stdin."
+            )
         try:
-            raw = json.loads(sys.stdin.read())
+            stdin_text = sys.stdin.read()
         except OSError as exc:
             raise ValueError(f"Unable to read input from stdin: {exc}") from exc
+        if not stdin_text.strip():
+            raise ValueError(
+                "No input provided on stdin. Pass --input PATH or pipe JSON to stdin."
+            )
+        try:
+            raw = json.loads(stdin_text)
         except json.JSONDecodeError as exc:
             raise ValueError(f"Standard input is not valid JSON: {exc}") from exc
     else:

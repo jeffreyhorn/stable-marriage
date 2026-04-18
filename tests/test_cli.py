@@ -14,6 +14,17 @@ import pytest
 from stable_marriage import cli
 
 
+class FakeStdin(io.StringIO):
+    """StringIO test double with controllable TTY behavior."""
+
+    def __init__(self, text: str, *, is_tty: bool) -> None:
+        super().__init__(text)
+        self._is_tty = is_tty
+
+    def isatty(self) -> bool:
+        return self._is_tty
+
+
 def make_sample_preferences(path: Path) -> Path:
     payload = {
         "proposers": {
@@ -60,13 +71,14 @@ def test_cli_reads_preferences_from_stdin(capsys, monkeypatch):
     monkeypatch.setattr(
         sys,
         "stdin",
-        io.StringIO(
+        FakeStdin(
             json.dumps(
                 {
                     "proposers": {"A": ["X", "Y"], "B": ["Y", "X"]},
                     "receivers": {"X": ["A", "B"], "Y": ["B", "A"]},
                 }
-            )
+            ),
+            is_tty=False,
         ),
     )
 
@@ -232,7 +244,7 @@ def test_cli_reports_missing_input_file(capsys, tmp_path):
 
 
 def test_cli_reports_invalid_json_from_stdin(capsys, monkeypatch):
-    monkeypatch.setattr(sys, "stdin", io.StringIO("not-json"))
+    monkeypatch.setattr(sys, "stdin", FakeStdin("not-json", is_tty=False))
 
     exit_code = cli.main([])
 
@@ -240,6 +252,28 @@ def test_cli_reports_invalid_json_from_stdin(capsys, monkeypatch):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "Standard input is not valid JSON" in captured.err
+
+
+def test_cli_reports_missing_stdin_input(capsys, monkeypatch):
+    monkeypatch.setattr(sys, "stdin", FakeStdin("", is_tty=True))
+
+    exit_code = cli.main([])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "No input provided on stdin" in captured.err
+
+
+def test_cli_reports_empty_non_tty_stdin(capsys, monkeypatch):
+    monkeypatch.setattr(sys, "stdin", FakeStdin("   \n", is_tty=False))
+
+    exit_code = cli.main([])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "No input provided on stdin" in captured.err
 
 
 def test_cli_requires_top_level_json_object(tmp_path, capsys):
