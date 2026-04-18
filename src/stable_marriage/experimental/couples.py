@@ -2,22 +2,26 @@
 
 from __future__ import annotations
 
+import logging
 from collections import deque
-from collections.abc import Hashable, Iterable, Mapping, Sequence
-from typing import Deque, Dict, List, Optional, Set, Tuple, cast
+from collections.abc import Mapping, Sequence
+from typing import cast
 
-from ..types import Matching, Person
+from ..types import Person
 from ..validation import validate_inputs
+from ._bases import _receiver_base
+from ._types import CoupleMapping, EntityId, ReceiverBaseFn
+from ._validation import _validate_couples
 
-CoupleMapping = Mapping[str, Sequence[Person]]
-EntityId = Tuple[str, Hashable]
+logger = logging.getLogger(__name__)
 
 
 def stable_marriage_with_couples(
     proposers: Mapping[Person, Sequence[Person]],
     receivers: Mapping[Person, Sequence[Person]],
     couples: CoupleMapping,
-) -> Matching:
+    base_fn: ReceiverBaseFn | None = None,
+) -> dict[Person, Person]:
     """
     Compute a matching with an experimental couples heuristic.
 
@@ -42,8 +46,10 @@ def stable_marriage_with_couples(
           exist.
         - Couple members must induce the same ordered base sequence after
           receiver labels are collapsed into bases.
-        - Receiver bases are derived from string suffixes such as ``_SlotA`` or
-          ``-SlotA`` rather than explicit structured slot metadata.
+        - By default, receiver bases are derived from string suffixes such as
+          ``_A``, ``_SlotA``, or ``-SlotA`` rather than explicit structured
+          slot metadata. Callers with different naming schemes must pass a
+          custom ``base_fn``.
 
     Args:
         proposers: Mapping of proposer identifiers to their ordered preference
@@ -52,6 +58,10 @@ def stable_marriage_with_couples(
             lists.
         couples: Mapping describing coupled proposers whose assignments must
             satisfy the heuristic's joint-placement constraints.
+        base_fn: Optional function used to collapse a receiver identifier into
+            a base string for couple alignment. When omitted, the heuristic
+            uses ``_receiver_base()``, which strips trailing slot suffixes such
+            as ``_A``, ``_SlotA``, and ``-SlotA``.
 
     Returns:
         Dict mapping each proposer to the receiver they are matched with.
@@ -64,47 +74,57 @@ def stable_marriage_with_couples(
     """
 
     validate_inputs(proposers, receivers)
-    return _stable_marriage_with_couples(proposers, receivers, couples)
+    return _stable_marriage_with_couples(proposers, receivers, couples, base_fn)
 
 
 def _stable_marriage_with_couples(
     proposers: Mapping[Person, Sequence[Person]],
     receivers: Mapping[Person, Sequence[Person]],
     couples: CoupleMapping,
-) -> Matching:
+    base_fn: ReceiverBaseFn | None = None,
+) -> dict[Person, Person]:
     """
     Run the experimental couples heuristic over receiver-base preferences.
 
     Couples must have members whose preference lists collapse to an identical
     ordering of receiver base identifiers. Each couple proposal reserves one
-    distinct receiver per member at the targeted base.
+    distinct receiver per member at the targeted base. The implementation
+    enforces a conservative upper bound of ``n^2 * max(len(couples), 1)``
+    queue iterations, where ``n`` is the number of proposers, and raises
+    ``ValueError`` if that bound is exceeded.
     """
+
+    receiver_base = _receiver_base if base_fn is None else base_fn
 
     (
         couple_preferences,
         member_base_options,
         _receivers_by_base,
-    ) = _validate_couples(proposers, receivers, couples)
+    ) = _validate_couples(proposers, receivers, couples, receiver_base)
 
-    receiver_rankings: Dict[Person, Dict[Person, int]] = {
+    receiver_rankings: dict[Person, dict[Person, int]] = {
         receiver: {proposer: rank for rank, proposer in enumerate(preferences)}
         for receiver, preferences in receivers.items()
     }
 
-    engagements: Dict[Person, Person] = {}
-    member_assignment: Dict[Person, Optional[Person]] = {
+    engagements: dict[Person, Person] = {}
+    member_assignment: dict[Person, Person | None] = {
         proposer: None for proposer in proposers.keys()
     }
 
-    entity_members: Dict[EntityId, List[Person]] = {}
-    entity_preferences: Dict[EntityId, Sequence[Person] | Sequence[str]] = {}
-    next_choice_index: Dict[EntityId, int] = {}
-    member_to_entity: Dict[Person, EntityId] = {}
+    entity_members: dict[EntityId, list[Person]] = {}
+    entity_preferences: dict[EntityId, Sequence[Person] | Sequence[str]] = {}
+    next_choice_index: dict[EntityId, int] = {}
+    member_to_entity: dict[Person, EntityId] = {}
 
-    queue: Deque[EntityId] = deque()
-    in_queue: Set[EntityId] = set()
+    queue: deque[EntityId] = deque()
+    in_queue: set[EntityId] = set()
 
-    couple_member_ids: Set[Person] = set()
+    def entity_label(entity: EntityId) -> str:
+        kind, identifier = entity
+        return f"{kind}:{identifier!r}"
+
+    couple_member_ids: set[Person] = set()
     for couple_id, members in couples.items():
         name: EntityId = ("couple", couple_id)
         entity_members[name] = list(members)
@@ -112,6 +132,7 @@ def _stable_marriage_with_couples(
         next_choice_index[name] = 0
         queue.append(name)
         in_queue.add(name)
+        logger.debug("Created %s with members %s", entity_label(name), list(members))
         for member in members:
             member_to_entity[member] = name
             couple_member_ids.add(member)
@@ -126,10 +147,7 @@ def _stable_marriage_with_couples(
         queue.append(name)
         in_queue.add(name)
         member_to_entity[proposer] = name
-
-    def entity_label(entity: EntityId) -> str:
-        kind, identifier = entity
-        return f"{kind}:{identifier!r}"
+        logger.debug("Created %s with member %r", entity_label(name), proposer)
 
     def enqueue(entity: EntityId) -> None:
         if entity not in in_queue:
@@ -148,7 +166,16 @@ def _stable_marriage_with_couples(
         if requeue:
             enqueue(entity)
 
+    max_iterations = _max_heuristic_iterations(proposers, couples)
+    iteration_count = 0
     while queue:
+        iteration_count += 1
+        if iteration_count > max_iterations:
+            raise ValueError(
+                "The experimental couples heuristic exceeded its iteration bound "
+                f"({max_iterations}) without converging."
+            )
+
         entity = queue.popleft()
         in_queue.discard(entity)
 
@@ -162,6 +189,7 @@ def _stable_marriage_with_couples(
 
         choice = preferences[index]
         next_choice_index[entity] += 1
+        logger.debug("%s proposes to %r", entity_label(entity), choice)
 
         if entity[0] == "single":
             member = entity_members[entity][0]
@@ -172,6 +200,12 @@ def _stable_marriage_with_couples(
                 release_entity(entity, requeue=False)
                 engagements[receiver] = member
                 member_assignment[member] = receiver
+                logger.debug(
+                    "%s accepted by %r; %r is now matched",
+                    entity_label(entity),
+                    receiver,
+                    member,
+                )
                 continue
 
             if current_partner == member:
@@ -181,20 +215,40 @@ def _stable_marriage_with_couples(
             challenger_rank = receiver_rankings[receiver][member]
 
             if challenger_rank < current_rank:
+                logger.debug(
+                    "%s displaces %r at %r",
+                    entity_label(entity),
+                    current_partner,
+                    receiver,
+                )
                 release_entity(member_to_entity[current_partner])
                 release_entity(entity, requeue=False)
                 engagements[receiver] = member
                 member_assignment[member] = receiver
+                logger.debug(
+                    "%s accepted by %r after displacement",
+                    entity_label(entity),
+                    receiver,
+                )
             else:
+                logger.debug(
+                    "%s rejected by %r in favor of %r",
+                    entity_label(entity),
+                    receiver,
+                    current_partner,
+                )
                 enqueue(entity)
             continue
 
         members = entity_members[entity]
         base = cast(str, choice)
         targeted = _select_couple_targets(members, base, member_base_options)
+        logger.debug(
+            "%s targets base %r with receivers %s", entity_label(entity), base, targeted
+        )
 
         rejecting = False
-        displaced_entities: Set[EntityId] = set()
+        displaced_entities: set[EntityId] = set()
         for member, receiver in targeted:
             current_partner = engagements.get(receiver)
             if current_partner is None:
@@ -209,6 +263,13 @@ def _stable_marriage_with_couples(
             if challenger_rank < current_rank:
                 displaced_entities.add(member_to_entity[current_partner])
             else:
+                logger.debug(
+                    "%s rejected at %r because %r outranks %r",
+                    entity_label(entity),
+                    receiver,
+                    current_partner,
+                    member,
+                )
                 rejecting = True
                 break
 
@@ -217,6 +278,9 @@ def _stable_marriage_with_couples(
             continue
 
         for displaced in displaced_entities:
+            logger.debug(
+                "%s displaced by %s", entity_label(displaced), entity_label(entity)
+            )
             release_entity(displaced)
 
         release_entity(entity, requeue=False)
@@ -224,6 +288,12 @@ def _stable_marriage_with_couples(
         for member, receiver in targeted:
             engagements[receiver] = member
             member_assignment[member] = receiver
+        logger.debug(
+            "%s accepted at base %r with assignments %s",
+            entity_label(entity),
+            base,
+            targeted,
+        )
 
     unmatched = [
         member for member, receiver in member_assignment.items() if receiver is None
@@ -233,117 +303,39 @@ def _stable_marriage_with_couples(
             "The experimental couples heuristic failed to assign every proposer."
         )
 
-    return {
+    result: dict[Person, Person] = {
         member: receiver
         for member, receiver in member_assignment.items()
         if receiver is not None
     }
+    logger.debug("Completed couples heuristic with matching %s", result)
+    return result
 
 
-def _validate_couples(
+def _max_heuristic_iterations(
     proposers: Mapping[Person, Sequence[Person]],
-    receivers: Mapping[Person, Sequence[Person]],
     couples: CoupleMapping,
-) -> Tuple[
-    Dict[str, Sequence[str]],
-    Dict[Person, Dict[str, List[Person]]],
-    Dict[str, List[Person]],
-]:
-    """
-    Validate couple metadata and prepare heuristic preference structures.
+) -> int:
+    """Return a conservative queue-iteration bound for the couples heuristic."""
 
-    Returns:
-        - Mapping of couple identifier to ordered base preferences.
-        - Mapping of proposer member to their available receivers per base.
-        - Mapping of base identifiers to receivers belonging to that base.
-    """
-
-    receivers_by_base = _group_receivers_by_base(receivers.keys())
-
-    seen_members: Set[Person] = set()
-    couple_preferences: Dict[str, Sequence[str]] = {}
-    member_base_options: Dict[Person, Dict[str, List[Person]]] = {}
-
-    for couple_id, members in couples.items():
-        if not members:
-            raise ValueError(f"Couple {couple_id!r} must list at least one member.")
-
-        base_sequence: Optional[List[str]] = None
-        members_in_couple: Set[Person] = set()
-
-        for member in members:
-            if member in members_in_couple:
-                raise ValueError(
-                    f"Participant {member!r} appears more than once in couple {couple_id!r}."
-                )
-            if member in seen_members:
-                raise ValueError(f"Participant {member!r} appears in multiple couples.")
-            if member not in proposers:
-                raise ValueError(
-                    f"Couple member {member!r} is not present in proposer preferences."
-                )
-
-            preferences = proposers[member]
-            base_order: List[str] = []
-            base_receivers: Dict[str, List[Person]] = {}
-
-            for receiver in preferences:
-                base = _receiver_base(receiver)
-                if base not in base_receivers:
-                    base_receivers[base] = []
-                    base_order.append(base)
-                base_receivers[base].append(receiver)
-
-            if base_sequence is None:
-                base_sequence = base_order
-            elif base_order != base_sequence:
-                raise ValueError(
-                    f"Couple {couple_id!r} members must share identical base preferences."
-                )
-
-            member_base_options[member] = base_receivers
-            seen_members.add(member)
-            members_in_couple.add(member)
-
-        if base_sequence is None:
-            raise ValueError(f"Couple {couple_id!r} has empty preference lists.")
-
-        for base in base_sequence:
-            if base not in receivers_by_base:
-                raise ValueError(
-                    f"Couple {couple_id!r} prefers base {base!r} "
-                    "which has no corresponding receivers."
-                )
-            if len(receivers_by_base[base]) < len(members):
-                raise ValueError(
-                    f"Base {base!r} does not provide enough positions "
-                    f"for couple {couple_id!r}."
-                )
-
-        couple_preferences[couple_id] = tuple(base_sequence)
-
-    return couple_preferences, member_base_options, receivers_by_base
-
-
-def _group_receivers_by_base(receivers: Iterable[Person]) -> Dict[str, List[Person]]:
-    grouped: Dict[str, List[Person]] = {}
-
-    for receiver in receivers:
-        base = _receiver_base(receiver)
-        grouped.setdefault(base, []).append(receiver)
-
-    return grouped
+    size = len(proposers)
+    return size * size * max(len(couples), 1)
 
 
 def _select_couple_targets(
     members: Sequence[Person],
     base: str,
-    member_base_options: Mapping[Person, Mapping[str, List[Person]]],
-) -> List[Tuple[Person, Person]]:
-    """Choose distinct receivers for each member of a couple at one base."""
+    member_base_options: Mapping[Person, Mapping[str, list[Person]]],
+) -> list[tuple[Person, Person]]:
+    """
+    Choose distinct receivers for each member of a couple at one base.
 
-    selected: List[Tuple[Person, Person]] = []
-    used_receivers: Set[Person] = set()
+    Member iteration order affects which receiver each member gets when
+    multiple distinct receivers are available at the same base.
+    """
+
+    selected: list[tuple[Person, Person]] = []
+    used_receivers: set[Person] = set()
 
     for member in members:
         options = member_base_options[member].get(base)
@@ -352,7 +344,7 @@ def _select_couple_targets(
                 f"Member {member!r} lacks receivers for preferred base {base!r}."
             )
 
-        chosen: Optional[Person] = None
+        chosen: Person | None = None
         for receiver in options:
             if receiver not in used_receivers:
                 chosen = receiver
@@ -367,32 +359,6 @@ def _select_couple_targets(
         selected.append((member, chosen))
 
     return selected
-
-
-def _receiver_base(receiver: Hashable) -> str:
-    """
-    Derive a base identifier from a receiver label.
-
-    Examples:
-        H1_A -> H1
-        Hospital-1-SlotA -> Hospital-1
-    """
-
-    receiver_text = receiver if isinstance(receiver, str) else str(receiver)
-
-    split_at = -1
-    for delimiter in ("_", "-"):
-        split_at = max(split_at, receiver_text.rfind(delimiter))
-    if split_at == -1:
-        return receiver_text
-
-    suffix = receiver_text[split_at + 1 :]
-    if (len(suffix) == 1 and suffix.isalpha()) or (
-        suffix.startswith("Slot") and len(suffix) > 4 and suffix[4:].isalpha()
-    ):
-        return receiver_text[:split_at]
-
-    return receiver_text
 
 
 __all__ = ["stable_marriage_with_couples"]

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Hashable
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 Person = TypeVar("Person", bound=Hashable)
-Matching = dict[Person, Person]
+# Function signatures using ``Person`` carry the stronger same-side typing;
+# this alias documents the concrete runtime shape of returned matchings.
+Matching: TypeAlias = dict[Hashable, Hashable]
 
 __all__ = ["Matching", "Person"]

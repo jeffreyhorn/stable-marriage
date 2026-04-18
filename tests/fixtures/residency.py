@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
-
-PreferenceProfile = Tuple[Dict[str, List[str]], Dict[str, List[str]]]
+from .preferences import PreferenceProfile
 
 
 def make_residency_preferences(size: int = 20) -> PreferenceProfile:
@@ -22,12 +20,12 @@ def make_residency_preferences(size: int = 20) -> PreferenceProfile:
     proposers = [f"P{i:0{width}d}" for i in range(size)]
     receivers = [f"R{i:0{width}d}" for i in range(size)]
 
-    proposer_preferences: Dict[str, List[str]] = {}
+    proposer_preferences: dict[str, list[str]] = {}
     for idx, proposer in enumerate(proposers):
         rotation = receivers[idx:] + receivers[:idx]
         proposer_preferences[proposer] = rotation
 
-    receiver_preferences: Dict[str, List[str]] = {}
+    receiver_preferences: dict[str, list[str]] = {}
     for idx, receiver in enumerate(receivers):
         rotation = proposers[idx:] + proposers[:idx]
         receiver_preferences[receiver] = rotation

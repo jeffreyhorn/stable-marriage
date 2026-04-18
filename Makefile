@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint format test typecheck coverage clean
+.PHONY: help install install-dev lint format test typecheck coverage packaging-smoke clean
 
 # Detect virtual environment
 VENV_BIN := $(shell if [ -d ".venv/bin" ]; then echo ".venv/bin/"; else echo ""; fi)
@@ -15,6 +15,7 @@ help:
 	@echo "  format          - Format code with black and ruff"
 	@echo "  test            - Run tests with pytest"
 	@echo "  coverage        - Run tests with coverage report"
+	@echo "  packaging-smoke - Verify installed typing and module entrypoint behavior"
 	@echo "  clean           - Remove build artifacts and caches"
 	@echo ""
 	@echo "Note: If .venv/ exists, it will be used automatically"
@@ -49,6 +50,10 @@ typecheck:
 coverage:
 	@echo "Running tests with coverage..."
 	$(PYTHON) -m pytest --cov=stable_marriage --cov-report=term-missing tests/
+
+packaging-smoke:
+	@echo "Running packaging smoke checks..."
+	$(PYTHON) scripts/packaging_smoke.py
 
 clean:
 	@echo "Cleaning build artifacts..."

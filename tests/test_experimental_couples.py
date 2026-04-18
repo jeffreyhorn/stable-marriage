@@ -3,12 +3,11 @@ from __future__ import annotations
 import pytest
 
 import stable_marriage
+from stable_marriage.experimental import couples as couples_module
 from stable_marriage.experimental import stable_marriage_with_couples
-from stable_marriage.experimental.couples import (
-    _receiver_base,
-    _select_couple_targets,
-    _validate_couples,
-)
+from stable_marriage.experimental._bases import _group_receivers_by_base, _receiver_base
+from stable_marriage.experimental._validation import _validate_couples
+from stable_marriage.experimental.couples import _select_couple_targets
 from tests.fixtures import (
     make_conflicting_coupled_preferences,
     make_coupled_preferences,
@@ -35,12 +34,43 @@ def test_conflicting_coupled_preferences_expose_limitation():
         stable_marriage_with_couples(proposers, receivers, couples)
 
 
+def test_couples_mode_fails_fast_when_iteration_bound_is_exceeded(monkeypatch):
+    proposers, receivers, couples = make_coupled_preferences()
+
+    monkeypatch.setattr(couples_module, "_max_heuristic_iterations", lambda *_: 0)
+
+    with pytest.raises(ValueError, match="exceeded its iteration bound"):
+        stable_marriage_with_couples(proposers, receivers, couples)
+
+
+def test_couples_mode_accepts_hashable_non_string_couple_ids():
+    proposers, receivers, couples = make_coupled_preferences()
+    couples = {1: couples["C1"]}
+
+    matches = stable_marriage_with_couples(proposers, receivers, couples)
+
+    assert set(matches.keys()) == set(proposers.keys())
+    assert set(matches.values()) == set(receivers.keys())
+
+
 def test_receiver_base_keeps_hyphenated_hospital_name():
     assert _receiver_base("Hospital-1-SlotA") == "Hospital-1"
     assert _receiver_base("Hospital-1-SlotB") == "Hospital-1"
     assert _receiver_base("H1_A") == "H1"
     assert _receiver_base("Hospital-1") == "Hospital-1"
     assert _receiver_base("Hospital_1") == "Hospital_1"
+
+
+def test_group_receivers_by_base_supports_custom_parser():
+    grouped = _group_receivers_by_base(
+        ["North::1", "North::2", "South::1"],
+        base_fn=lambda receiver: str(receiver).split("::", 1)[0],
+    )
+
+    assert grouped == {
+        "North": ["North::1", "North::2"],
+        "South": ["South::1"],
+    }
 
 
 def test_couples_mode_accepts_hyphenated_receiver_bases():
@@ -90,6 +120,32 @@ def test_couples_mode_accepts_hyphenated_receiver_bases():
     } == {"Hospital-1"}
 
 
+def test_couples_mode_accepts_custom_receiver_base_parser():
+    proposers = {
+        "C1_A": ["North::1", "North::2", "South::1", "South::2"],
+        "C1_B": ["North::2", "North::1", "South::2", "South::1"],
+        "Single_A": ["South::1", "South::2", "North::1", "North::2"],
+        "Single_B": ["South::2", "South::1", "North::2", "North::1"],
+    }
+    receivers = {
+        "North::1": ["C1_A", "Single_A", "Single_B", "C1_B"],
+        "North::2": ["C1_B", "Single_B", "Single_A", "C1_A"],
+        "South::1": ["Single_A", "Single_B", "C1_A", "C1_B"],
+        "South::2": ["Single_B", "Single_A", "C1_B", "C1_A"],
+    }
+    couples = {"C1": ["C1_A", "C1_B"]}
+
+    matches = stable_marriage_with_couples(
+        proposers,
+        receivers,
+        couples,
+        base_fn=lambda receiver: str(receiver).split("::", 1)[0],
+    )
+
+    assert {matches["Single_A"], matches["Single_B"]} == {"South::1", "South::2"}
+    assert {matches["C1_A"], matches["C1_B"]} == {"North::1", "North::2"}
+
+
 def test_single_entities_do_not_collide_on_stringified_ids():
     proposers = {
         1: ["X", "Y"],
@@ -134,12 +190,44 @@ def test_root_package_does_not_export_experimental_couples_api():
     assert not hasattr(stable_marriage, "stable_marriage_with_couples")
 
 
+def test_validate_couples_returns_expected_preprocessed_structures():
+    proposers, receivers, couples = make_coupled_preferences()
+
+    couple_preferences, member_base_options, receivers_by_base = _validate_couples(
+        proposers,
+        receivers,
+        couples,
+    )
+
+    assert couple_preferences == {"C1": ("H1", "H2")}
+    assert member_base_options["C1_A"] == {
+        "H1": ["H1_A", "H1_B"],
+        "H2": ["H2_A", "H2_B"],
+    }
+    assert member_base_options["C1_B"] == {
+        "H1": ["H1_B", "H1_A"],
+        "H2": ["H2_B", "H2_A"],
+    }
+    assert receivers_by_base == {
+        "H1": ["H1_A", "H1_B"],
+        "H2": ["H2_A", "H2_B"],
+    }
+
+
 def test_couples_validation_rejects_empty_couple():
     proposers = {"A": ["X"], "B": ["Y"]}
     receivers = {"X": ["A", "B"], "Y": ["B", "A"]}
 
-    with pytest.raises(ValueError, match="must list at least one member"):
+    with pytest.raises(ValueError, match="must have at least two members"):
         _validate_couples(proposers, receivers, {"C1": []})
+
+
+def test_couples_validation_rejects_single_member_couple():
+    proposers = {"A": ["X"], "B": ["Y"]}
+    receivers = {"X": ["A", "B"], "Y": ["B", "A"]}
+
+    with pytest.raises(ValueError, match="must have at least two members"):
+        _validate_couples(proposers, receivers, {"C1": ["A"]})
 
 
 def test_couples_validation_rejects_duplicate_member_across_couples():

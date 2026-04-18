@@ -7,7 +7,7 @@ import json
 import sys
 from collections.abc import Hashable, Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .core import stable_marriage
 from .types import Matching
@@ -23,8 +23,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--input",
         "-i",
         type=Path,
-        required=True,
-        help="Path to a JSON file with `proposers` and `receivers` preference maps.",
+        help="Optional path to a JSON file with `proposers` and `receivers`; defaults to stdin.",
     )
     parser.add_argument(
         "--output",
@@ -42,18 +41,26 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def load_preferences(
-    path: Path,
-) -> tuple[dict[Hashable, list[Hashable]], dict[Hashable, list[Hashable]]]:
-    """Load and validate proposer and receiver preferences from a UTF-8 JSON file."""
+    path: Path | None,
+) -> tuple[dict[Hashable, list[Any]], dict[Hashable, list[Any]]]:
+    """Load and validate proposer and receiver preferences from a file or stdin."""
 
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ValueError(f"Input file {path} does not exist.") from exc
-    except OSError as exc:
-        raise ValueError(f"Unable to read input file {path}: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Input file {path} is not valid JSON: {exc}") from exc
+    if path is None:
+        try:
+            raw = json.loads(sys.stdin.read())
+        except OSError as exc:
+            raise ValueError(f"Unable to read input from stdin: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Standard input is not valid JSON: {exc}") from exc
+    else:
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            raise ValueError(f"Input file {path} does not exist.") from exc
+        except OSError as exc:
+            raise ValueError(f"Unable to read input file {path}: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Input file {path} is not valid JSON: {exc}") from exc
 
     if not isinstance(raw, dict):
         raise ValueError("Preference file must be a JSON object.")
@@ -93,43 +100,28 @@ def load_preferences(
 def _canonicalize_preferences(
     raw_preferences: Mapping[Any, Any],
     label: str,
-) -> dict[Hashable, list[Hashable]]:
+) -> dict[Hashable, list[Any]]:
     """
-    Ensure preference lists are sequences of hashable identifiers.
+    Ensure preference values are JSON arrays and normalize them to Python lists.
 
     Args:
         raw_preferences: Mapping from participant IDs to their raw preference values.
         label: Human-readable label for error messages.
 
     Raises:
-        ValueError: If a participant key is unhashable, their preferences are not a
-            sequence (list/tuple), or contain non-hashable members.
+        ValueError: If a participant's preferences are not represented as a JSON
+            array.
     """
 
-    canonical: dict[Hashable, list[Hashable]] = {}
+    canonical: dict[Hashable, list[Any]] = {}
 
     for participant, preferences in raw_preferences.items():
-        if not isinstance(participant, Hashable):
-            raise ValueError(
-                f"{label} keys must be hashable identifiers; got {participant!r}."
-            )
-
-        if not isinstance(preferences, Sequence) or isinstance(
-            preferences, (str, bytes)
-        ):
+        if not isinstance(preferences, list):
             raise ValueError(
                 f"{label} preference list for {participant!r} must be a JSON array of identifiers."
             )
 
-        canonical_preferences: list[Hashable] = []
-        for option in preferences:
-            if not isinstance(option, Hashable):
-                raise ValueError(
-                    f"{label} preference for {participant!r} contains non-hashable value {option!r}."
-                )
-            canonical_preferences.append(option)
-
-        canonical[participant] = canonical_preferences
+        canonical[cast(Hashable, participant)] = list(preferences)
 
     return canonical
 
@@ -160,7 +152,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         proposers, receivers = load_preferences(args.input)
-        matching = stable_marriage(proposers, receivers)
+        matching = stable_marriage(
+            cast(Mapping[Hashable, Sequence[Hashable]], proposers),
+            cast(Mapping[Hashable, Sequence[Hashable]], receivers),
+        )
         dump_matching(matching, args.output, args.indent)
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)

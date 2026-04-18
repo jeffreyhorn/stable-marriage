@@ -5,14 +5,14 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Mapping, Sequence
 
-from .types import Matching, Person
+from .types import Person
 from .validation import validate_inputs
 
 
 def stable_marriage(
     proposers: Mapping[Person, Sequence[Person]],
     receivers: Mapping[Person, Sequence[Person]],
-) -> Matching:
+) -> dict[Person, Person]:
     """
     Compute a stable matching using the classical Gale-Shapley algorithm.
 
@@ -38,7 +38,7 @@ def stable_marriage(
 def _stable_marriage_one_to_one(
     proposers: Mapping[Person, Sequence[Person]],
     receivers: Mapping[Person, Sequence[Person]],
-) -> Matching:
+) -> dict[Person, Person]:
     """Classical Gale-Shapley solver without couple constraints."""
 
     free_proposers = deque(proposers.keys())

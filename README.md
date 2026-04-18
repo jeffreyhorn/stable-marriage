@@ -102,6 +102,12 @@ run:
 stable-marriage --input data/sample_preferences.json
 ```
 
+If `--input` is omitted, the CLI reads JSON from standard input:
+
+```bash
+cat data/sample_preferences.json | stable-marriage --indent 0
+```
+
 Write the matching to a file:
 
 ```bash

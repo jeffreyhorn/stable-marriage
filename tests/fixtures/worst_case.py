@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
-
-PreferenceProfile = Tuple[Dict[str, List[str]], Dict[str, List[str]]]
+from .preferences import PreferenceProfile
 
 
 def make_worst_case_preferences(size: int = 10) -> PreferenceProfile:
@@ -23,11 +21,11 @@ def make_worst_case_preferences(size: int = 10) -> PreferenceProfile:
     proposers = [f"M{i:0{width}d}" for i in range(size)]
     receivers = [f"W{i:0{width}d}" for i in range(size)]
 
-    proposer_preferences: Dict[str, List[str]] = {
+    proposer_preferences: dict[str, list[str]] = {
         proposer: receivers[:] for proposer in proposers
     }
 
-    receiver_preferences: Dict[str, List[str]] = {}
+    receiver_preferences: dict[str, list[str]] = {}
     for idx, receiver in enumerate(receivers):
         # Women prefer earlier-indexed proposers first (in reverse order),
         # then wrap to the remaining proposers descending from the end.

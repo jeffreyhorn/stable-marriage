@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import importlib
+import io
 import json
 import os
 import subprocess
+import sys
 import sysconfig
 from pathlib import Path
 
@@ -53,6 +56,28 @@ def test_cli_writes_output_file(tmp_path, capsys):
     assert json.loads(output_path.read_text(encoding="utf-8")) == {"A": "X", "B": "Y"}
 
 
+def test_cli_reads_preferences_from_stdin(capsys, monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            json.dumps(
+                {
+                    "proposers": {"A": ["X", "Y"], "B": ["Y", "X"]},
+                    "receivers": {"X": ["A", "B"], "Y": ["B", "A"]},
+                }
+            )
+        ),
+    )
+
+    exit_code = cli.main(["--indent", "0"])
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out == '{"A":"X","B":"Y"}\n'
+    assert captured.err == ""
+
+
 def test_installed_console_script_smoke(tmp_path):
     input_path = make_sample_preferences(tmp_path / "prefs.json")
     script_name = "stable-marriage.exe" if os.name == "nt" else "stable-marriage"
@@ -73,6 +98,60 @@ def test_installed_console_script_smoke(tmp_path):
     assert completed.returncode == 0
     assert json.loads(completed.stdout) == {"A": "X", "B": "Y"}
     assert completed.stderr == ""
+
+
+def test_python_dash_m_works_without_install(tmp_path):
+    input_path = make_sample_preferences(tmp_path / "prefs.json")
+    repo_root = Path(__file__).resolve().parents[1]
+    env = os.environ | {"PYTHONPATH": str(repo_root / "src")}
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            "-m",
+            "stable_marriage",
+            "--input",
+            str(input_path),
+            "--indent",
+            "0",
+        ],
+        check=False,
+        capture_output=True,
+        cwd=repo_root,
+        env=env,
+        text=True,
+    )
+
+    assert completed.returncode == 0
+    assert json.loads(completed.stdout) == {"A": "X", "B": "Y"}
+    assert completed.stderr == ""
+
+
+def test_importing_package_main_module_does_not_execute_cli(monkeypatch):
+    cli_called = False
+
+    def fake_main() -> int:
+        nonlocal cli_called
+        cli_called = True
+        return 0
+
+    monkeypatch.setattr(cli, "main", fake_main)
+    sys.modules.pop("stable_marriage.__main__", None)
+
+    package_main = importlib.import_module("stable_marriage.__main__")
+
+    assert package_main.run is not None
+    assert cli_called is False
+
+
+def test_package_main_run_dispatches_to_cli(monkeypatch):
+    sys.modules.pop("stable_marriage.__main__", None)
+    package_main = importlib.import_module("stable_marriage.__main__")
+
+    monkeypatch.setattr(package_main, "main", lambda: 7)
+
+    assert package_main.run() == 7
 
 
 @pytest.mark.parametrize(
@@ -150,6 +229,17 @@ def test_cli_reports_missing_input_file(capsys, tmp_path):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "does not exist" in captured.err
+
+
+def test_cli_reports_invalid_json_from_stdin(capsys, monkeypatch):
+    monkeypatch.setattr(sys, "stdin", io.StringIO("not-json"))
+
+    exit_code = cli.main([])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Standard input is not valid JSON" in captured.err
 
 
 def test_cli_requires_top_level_json_object(tmp_path, capsys):
