@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,15 @@ def run_command(command: list[str], cwd: Path, env: dict[str, str]) -> subproces
         details = completed.stdout + completed.stderr
         raise RuntimeError(f"Command failed: {' '.join(command)}\n{details}")
     return completed
+
+
+def has_revealed_dict_str_str(output: str) -> bool:
+    """Accept minor mypy formatting differences for `dict[str, str]` reveals."""
+
+    return re.search(
+        r'Revealed type is "(?:builtins\.)?dict\[(?:builtins\.)?str, (?:builtins\.)?str\]"',
+        output,
+    ) is not None
 
 
 def main() -> int:
@@ -56,7 +66,7 @@ def main() -> int:
             cwd=temp_path,
             env=clean_env,
         )
-        if 'Revealed type is "dict[str, str]"' not in mypy.stdout:
+        if not has_revealed_dict_str_str(mypy.stdout):
             raise RuntimeError(
                 "Installed package was not treated as precisely typed.\n"
                 f"{mypy.stdout}{mypy.stderr}"

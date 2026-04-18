@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import os
 import random
+import re
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -21,6 +22,15 @@ from tests.fixtures import (
     make_unique_matching_preferences,
     make_worst_case_preferences,
 )
+
+
+def assert_revealed_dict_str_str(output: str) -> None:
+    """Accept minor mypy formatting differences for `dict[str, str]` reveals."""
+
+    assert re.search(
+        r'Revealed type is "(?:builtins\.)?dict\[(?:builtins\.)?str, (?:builtins\.)?str\]"',
+        output,
+    ), output
 
 
 def assert_matching_is_stable(
@@ -111,7 +121,7 @@ def test_downstream_mypy_reveals_concrete_root_solver_type(tmp_path):
     )
 
     assert completed.returncode == 0, completed.stdout + completed.stderr
-    assert 'Revealed type is "dict[str, str]"' in completed.stdout
+    assert_revealed_dict_str_str(completed.stdout)
 
 
 def test_invalid_roster_shapes_raise_value_error():
