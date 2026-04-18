@@ -158,6 +158,24 @@ def test_couples_validation_rejects_duplicate_member_across_couples():
         _validate_couples(proposers, receivers, {"C1": ["A", "B"], "C2": ["A", "C"]})
 
 
+def test_couples_validation_rejects_duplicate_member_within_same_couple():
+    proposers = {
+        "A": ["H1_A", "H1_B", "H2_A", "H2_B"],
+        "B": ["H1_B", "H1_A", "H2_B", "H2_A"],
+        "C": ["H1_A", "H1_B", "H2_A", "H2_B"],
+        "D": ["H1_B", "H1_A", "H2_B", "H2_A"],
+    }
+    receivers = {
+        "H1_A": ["A", "B", "C", "D"],
+        "H1_B": ["B", "A", "D", "C"],
+        "H2_A": ["C", "D", "A", "B"],
+        "H2_B": ["D", "C", "B", "A"],
+    }
+
+    with pytest.raises(ValueError, match="appears more than once in couple 'C1'"):
+        _validate_couples(proposers, receivers, {"C1": ["A", "A"]})
+
+
 def test_couples_validation_rejects_missing_member():
     proposers = {"A": ["X", "Y"], "B": ["Y", "X"]}
     receivers = {"X": ["A", "B"], "Y": ["B", "A"]}

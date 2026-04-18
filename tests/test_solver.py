@@ -6,8 +6,7 @@ from collections.abc import Sequence
 import pytest
 
 import stable_marriage.solver as solver_module
-from stable_marriage import stable_marriage
-from stable_marriage import core, types
+from stable_marriage import core, stable_marriage, types
 from tests.fixtures import (
     make_invalid_preference_profiles,
     make_invalid_roster_preferences,

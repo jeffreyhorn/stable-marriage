@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sysconfig
+from pathlib import Path
 
 import pytest
 
@@ -33,6 +33,7 @@ def test_cli_prints_matching_to_stdout(tmp_path, capsys):
 
     assert exit_code == 0
     captured = capsys.readouterr()
+    assert captured.out == '{"A":"X","B":"Y"}\n'
     assert json.loads(captured.out) == {"A": "X", "B": "Y"}
     assert captured.err == ""
 
@@ -48,6 +49,7 @@ def test_cli_writes_output_file(tmp_path, capsys):
     assert exit_code == 0
     captured = capsys.readouterr()
     assert captured.out == ""
+    assert output_path.read_text(encoding="utf-8") == '{"A":"X","B":"Y"}\n'
     assert json.loads(output_path.read_text(encoding="utf-8")) == {"A": "X", "B": "Y"}
 
 
@@ -223,3 +225,13 @@ def test_cli_reports_error_when_output_path_is_directory(tmp_path, capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "Unable to write matching" in captured.err
+
+
+def test_cli_pretty_prints_for_positive_indent(tmp_path, capsys):
+    input_path = make_sample_preferences(tmp_path / "prefs.json")
+
+    exit_code = cli.main(["--input", str(input_path), "--indent", "2"])
+
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith('{\n  "A": "X",\n')

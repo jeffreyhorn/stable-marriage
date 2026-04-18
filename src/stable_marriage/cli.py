@@ -137,7 +137,11 @@ def _canonicalize_preferences(
 def dump_matching(matching: Matching, output_path: Path | None, indent: int) -> None:
     """Serialize the matching to disk or stdout."""
 
-    payload = json.dumps(matching, indent=indent, sort_keys=True)
+    effective_indent = indent if indent > 0 else None
+    if effective_indent is None:
+        payload = json.dumps(matching, sort_keys=True, separators=(",", ":"))
+    else:
+        payload = json.dumps(matching, indent=effective_indent, sort_keys=True)
 
     if output_path is None:
         print(payload)

@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Hashable, Iterable, Mapping, Sequence
-from typing import Deque, Dict, List, Optional, Set, Tuple, TypeVar, cast
+from typing import Deque, Dict, List, Optional, Set, Tuple, cast
 
-from ..types import Matching
+from ..types import Matching, Person
 from ..validation import validate_inputs
 
-Person = TypeVar("Person", bound=Hashable)
 CoupleMapping = Mapping[str, Sequence[Person]]
 EntityId = Tuple[str, Hashable]
 
@@ -270,8 +269,13 @@ def _validate_couples(
             raise ValueError(f"Couple {couple_id!r} must list at least one member.")
 
         base_sequence: Optional[List[str]] = None
+        members_in_couple: Set[Person] = set()
 
         for member in members:
+            if member in members_in_couple:
+                raise ValueError(
+                    f"Participant {member!r} appears more than once in couple {couple_id!r}."
+                )
             if member in seen_members:
                 raise ValueError(f"Participant {member!r} appears in multiple couples.")
             if member not in proposers:
@@ -299,6 +303,7 @@ def _validate_couples(
 
             member_base_options[member] = base_receivers
             seen_members.add(member)
+            members_in_couple.add(member)
 
         if base_sequence is None:
             raise ValueError(f"Couple {couple_id!r} has empty preference lists.")
