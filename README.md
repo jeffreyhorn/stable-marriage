@@ -16,7 +16,7 @@ For a fresh repository checkout, use an editable install:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .[dev]
+pip install -e ".[dev]"
 ```
 
 That installs the package from `src/` and makes the CLI entry module importable

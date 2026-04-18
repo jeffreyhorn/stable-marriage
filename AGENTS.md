@@ -8,7 +8,7 @@
 
 ## Build, Test, and Development Commands
 - `python -m venv .venv && source .venv/bin/activate`: create and enter the local environment.
-- `pip install -e .[dev]`: install the package and development dependencies in editable mode.
+- `pip install -e ".[dev]"`: install the package and development dependencies in editable mode.
 - After the editable install, run `pytest`, `ruff check src tests`, and `python -m stable_marriage.cli --input data/sample_preferences.json` from the repository root to verify a fresh checkout.
 - `make test`: run the full test suite; use `pytest tests/test_solver.py -k stability` when you need to target specific cases directly.
 - `make format`: format Python sources with the repository's canonical formatter setup.
@@ -18,7 +18,7 @@
 
 ## CLI Usage
 - Preference files are JSON objects with `proposers` and `receivers` keys whose values map participant IDs to ranked lists (arrays) of the opposite side.
-- Because the project uses a `src/` layout, run `python -m stable_marriage.cli --input path/to/preferences.json` only after `pip install -e .[dev]` or `pip install .`.
+- Because the project uses a `src/` layout, run `python -m stable_marriage.cli --input path/to/preferences.json` only after `pip install -e ".[dev]"` or `pip install .`.
 - Provide `--output path/to/matches.json` to persist the matching, and `--indent 0` to disable pretty-printing when embedding in scripts.
 - Exit code `1` signals invalid input or write errors (malformed JSON, incomplete keys, non-array preferences, or unwritable output paths); the CLI prints the error message to stderr for quick diagnosis.
 
