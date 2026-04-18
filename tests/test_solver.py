@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import importlib
+import os
 import random
+import re
+import subprocess
+import sys
 from collections.abc import Mapping, Sequence
+from importlib import metadata as importlib_metadata
+from importlib.metadata import PackageNotFoundError
+from pathlib import Path
 
 import pytest
 
+import stable_marriage as stable_marriage_package
 import stable_marriage.solver as solver_module
-from stable_marriage import core, stable_marriage, types
+from stable_marriage import __version__, core, stable_marriage, types
 from tests.fixtures import (
     make_invalid_preference_profiles,
     make_invalid_roster_preferences,
@@ -14,6 +23,15 @@ from tests.fixtures import (
     make_unique_matching_preferences,
     make_worst_case_preferences,
 )
+
+
+def assert_revealed_dict_str_str(output: str) -> None:
+    """Accept minor mypy formatting differences for `dict[str, str]` reveals."""
+
+    assert re.search(
+        r'Revealed type is "(?:builtins\.)?dict\[(?:builtins\.)?str, (?:builtins\.)?str\]"',
+        output,
+    ), output
 
 
 def assert_matching_is_stable(
@@ -54,6 +72,60 @@ def test_stable_marriage_produces_expected_matching():
     assert matches == {"A": "X", "B": "Z", "C": "Y"}
 
     assert_matching_is_stable(proposers, receivers, matches)
+
+
+def test_package_exposes_non_empty_version_string():
+    assert isinstance(__version__, str)
+    assert __version__
+
+
+def test_package_version_falls_back_when_distribution_metadata_is_missing(monkeypatch):
+    def raise_package_not_found(_: str) -> str:
+        raise PackageNotFoundError("stable-marriage")
+
+    original_version = importlib_metadata.version
+    monkeypatch.setattr(importlib_metadata, "version", raise_package_not_found)
+
+    reloaded_package = importlib.reload(stable_marriage_package)
+
+    try:
+        assert reloaded_package.__version__ == "0.0.0-dev"
+    finally:
+        monkeypatch.setattr(importlib_metadata, "version", original_version)
+        importlib.reload(stable_marriage_package)
+
+
+def test_downstream_mypy_reveals_concrete_root_solver_type(tmp_path):
+    sample = tmp_path / "typecheck.py"
+    sample.write_text(
+        "\n".join(
+            [
+                "from stable_marriage import stable_marriage",
+                "",
+                'proposers = {"A": ["X", "Y"], "B": ["Y", "X"]}',
+                'receivers = {"X": ["A", "B"], "Y": ["B", "A"]}',
+                "result = stable_marriage(proposers, receivers)",
+                "reveal_type(result)",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    repo_root = Path(__file__).resolve().parents[1]
+    env = os.environ.copy()
+    env["MYPYPATH"] = str(repo_root / "src")
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "mypy", str(sample)],
+        check=False,
+        capture_output=True,
+        cwd=repo_root,
+        env=env,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert_revealed_dict_str_str(completed.stdout)
 
 
 def test_invalid_roster_shapes_raise_value_error():

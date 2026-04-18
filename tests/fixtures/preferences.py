@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Sequence, Tuple
+from collections.abc import Sequence
 
-PreferenceProfile = Tuple[Dict[str, Sequence[str]], Dict[str, Sequence[str]]]
+PreferenceProfile = tuple[dict[str, Sequence[str]], dict[str, Sequence[str]]]
 
 
 def make_unique_matching_preferences() -> PreferenceProfile:
@@ -29,9 +29,9 @@ def make_unique_matching_preferences() -> PreferenceProfile:
     return proposers, receivers
 
 
-def make_invalid_roster_preferences() -> Tuple[
-    Dict[str, Sequence[str]],
-    Dict[str, Sequence[str]],
+def make_invalid_roster_preferences() -> tuple[
+    dict[str, Sequence[str]],
+    dict[str, Sequence[str]],
 ]:
     """Return mismatched rosters to trigger participant count validation."""
 
@@ -47,7 +47,7 @@ def make_invalid_roster_preferences() -> Tuple[
     return proposers, receivers
 
 
-def make_invalid_preference_profiles() -> List[PreferenceProfile]:
+def make_invalid_preference_profiles() -> list[PreferenceProfile]:
     """Return preference sets that contain duplicate entries or omissions."""
 
     duplicate_receiver_entry = (

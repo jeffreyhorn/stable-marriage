@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
-
-CoupleProfile = Tuple[Dict[str, List[str]], Dict[str, List[str]], Dict[str, List[str]]]
+CoupleProfile = tuple[dict[str, list[str]], dict[str, list[str]], dict[str, list[str]]]
 
 
 def make_coupled_preferences() -> CoupleProfile:
@@ -16,14 +14,14 @@ def make_coupled_preferences() -> CoupleProfile:
         identifier to the list of proposer member identifiers.
     """
 
-    proposers: Dict[str, List[str]] = {
+    proposers: dict[str, list[str]] = {
         "C1_A": ["H1_A", "H2_A", "H1_B", "H2_B"],
         "C1_B": ["H1_B", "H2_B", "H1_A", "H2_A"],
         "S1": ["H2_A", "H1_A", "H2_B", "H1_B"],
         "S2": ["H2_B", "H1_B", "H2_A", "H1_A"],
     }
 
-    receivers: Dict[str, List[str]] = {
+    receivers: dict[str, list[str]] = {
         "H1_A": ["C1_A", "S1", "S2", "C1_B"],
         "H1_B": ["C1_B", "S2", "S1", "C1_A"],
         "H2_A": ["S1", "C1_A", "S2", "C1_B"],
@@ -42,14 +40,14 @@ def make_conflicting_coupled_preferences() -> CoupleProfile:
     independently can separate them across hospitals despite identical orders.
     """
 
-    proposers: Dict[str, List[str]] = {
+    proposers: dict[str, list[str]] = {
         "C1_A": ["H1_A", "H2_A", "H1_B", "H2_B"],
         "C1_B": ["H1_B", "H2_B", "H1_A", "H2_A"],
         "S1": ["H1_A", "H2_A", "H1_B", "H2_B"],
         "S2": ["H2_B", "H1_B", "H2_A", "H1_A"],
     }
 
-    receivers: Dict[str, List[str]] = {
+    receivers: dict[str, list[str]] = {
         "H1_A": ["S1", "C1_A", "C1_B", "S2"],
         "H1_B": ["S2", "C1_B", "C1_A", "S1"],
         "H2_A": ["C1_A", "S1", "S2", "C1_B"],

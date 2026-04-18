@@ -14,8 +14,8 @@ The helper accepts:
 
 - `proposers`: mapping of proposer IDs to complete preference lists
 - `receivers`: mapping of receiver IDs to complete preference lists
-- `couples`: mapping of couple IDs to the ordered member IDs belonging to that
-  couple
+- `couples`: mapping of hashable couple IDs to the ordered member IDs
+  belonging to that couple
 
 The base one-to-one validation still applies:
 
@@ -45,6 +45,11 @@ Examples:
 Couple placement is driven by these derived bases rather than by explicit
 metadata.
 
+If your receiver identifiers do not follow that suffix pattern, pass
+`base_fn=` to `stable_marriage_with_couples(...)` and return the base string
+your deployment uses. This is the supported way to handle custom naming
+schemes such as `North::1` / `North::2`.
+
 ## Guarantees When It Returns
 
 If `stable_marriage_with_couples(...)` returns successfully, the result
@@ -57,6 +62,10 @@ satisfies these properties:
 
 These are the guarantees of the current heuristic. They are not equivalent to a
 general proof of stability for the stable matching with couples problem.
+
+The current implementation also enforces a conservative queue-iteration bound
+of `n^2 * max(len(couples), 1)`, where `n` is the proposer count. Inputs that
+do not converge within that bound fail with `ValueError` instead of hanging.
 
 ## Non-Guarantees
 
@@ -71,6 +80,10 @@ This helper does not guarantee:
 ## Known Failure Modes
 
 - The heuristic can reject an instance even when a valid assignment may exist.
+- Pathological inputs can hit the conservative iteration bound and fail fast
+  with `ValueError` even if a different heuristic schedule might converge.
+- When multiple distinct receivers are available at one base, couple member
+  order affects which specific receiver each member gets.
 - Couple members with different collapsed base orders are rejected during
   validation.
 - Bases with too few distinct receiver slots for the couple size are rejected

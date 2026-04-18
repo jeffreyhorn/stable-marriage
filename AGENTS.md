@@ -1,9 +1,9 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Place all runnable code under `src/stable_marriage/`, grouping algorithms, utilities, and CLI entry points by feature (e.g., `algorithms.py`, `matching.py`, `visualization/`).
+- Place all runnable code under `src/stable_marriage/`, grouping the supported solver, validation helpers, CLI entry points, and experimental modules by feature (e.g., `core.py`, `validation.py`, `cli.py`, `experimental/couples.py`).
 - Keep reusable experiment notebooks or scripts in `notebooks/` or `scripts/`; convert production-ready logic into `src/` modules before shipping.
-- Store unit tests in `tests/`, mirroring the `src/` layout (`tests/test_matching.py` exercises `src/stable_marriage/matching.py`), and add fixtures in `tests/fixtures/`.
+- Store unit tests in `tests/`, mirroring the `src/` layout (`tests/test_solver.py` exercises `src/stable_marriage/core.py`, and `tests/test_experimental_couples.py` exercises `src/stable_marriage/experimental/couples.py`), and add fixtures in `tests/fixtures/`.
 - Check sample preference datasets into `data/` (small JSON/CSV) and document larger assets with download instructions in `data/README.md`.
 
 ## Build, Test, and Development Commands
@@ -18,7 +18,10 @@
 
 ## CLI Usage
 - Preference files are JSON objects with `proposers` and `receivers` keys whose values map participant IDs to ranked lists (arrays) of the opposite side.
-- Because the project uses a `src/` layout, run `stable-marriage --input path/to/preferences.json` only after `pip install -e ".[dev]"` or `pip install .`.
+- Because the project uses a `src/` layout, run `stable-marriage ...` only after `pip install -e ".[dev]"` or `pip install .`.
+- `--input` is optional. If omitted, the CLI reads the JSON payload from standard input.
+- File-based usage: `stable-marriage --input path/to/preferences.json`
+- Stdin usage: `cat data/sample_preferences.json | stable-marriage --indent 0`
 - The CLI intentionally supports only the classical one-to-one solver; experimental couples input is library-only and is rejected by the CLI.
 - Provide `--output path/to/matches.json` to persist the matching, and `--indent 0` to disable pretty-printing when embedding in scripts.
 - Exit code `1` signals invalid input or expected file I/O errors (malformed JSON, unreadable input, incomplete keys, non-array preferences, or unwritable output paths); the CLI prints the error message to stderr for quick diagnosis.

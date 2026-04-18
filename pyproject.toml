@@ -42,5 +42,16 @@ target-version = ["py311"]
 [tool.mypy]
 python_version = "3.11"
 
+[tool.coverage.run]
+branch = true
+source = ["stable_marriage"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+stable_marriage = ["py.typed"]

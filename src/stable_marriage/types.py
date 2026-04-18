@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Hashable
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 Person = TypeVar("Person", bound=Hashable)
-Matching = dict[Person, Person]
+# Matchings map participants to participants of the same inferred identifier type.
+Matching: TypeAlias = dict[Person, Person]
 
 __all__ = ["Matching", "Person"]
